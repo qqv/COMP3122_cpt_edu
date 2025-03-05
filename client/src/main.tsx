@@ -1,15 +1,21 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
-import Dashboard from './pages/Dashboard'
+import App from './App'
 import './index.css'
-import Sidebar from './components/Sidebar'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+// 添加错误边界
+const root = ReactDOM.createRoot(document.getElementById('root')!)
+
+// 添加错误处理
+window.addEventListener('error', (e) => {
+  console.error('Global error:', e)
+})
+
+root.render(
   <React.StrictMode>
     <BrowserRouter>
-      <Dashboard />
-      {/* <Sidebar /> */}
+      <App />
     </BrowserRouter>
   </React.StrictMode>
 ) 

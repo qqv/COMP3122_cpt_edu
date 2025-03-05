@@ -1,54 +1,129 @@
 import React from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import {
+  Box,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Typography,
+  Divider,
+  Avatar,
+  Stack
+} from '@mui/material'
+import {
+  Dashboard as DashboardIcon,
+  Group as GroupIcon,
+  School as SchoolIcon,
+  Analytics as AnalyticsIcon,
+  Description as ReportIcon,
+  Settings as SettingsIcon,
+  Logout as LogoutIcon
+} from '@mui/icons-material'
 
-function Sidebar() {
+const menuItems = [
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+  { text: 'Teams', icon: <GroupIcon />, path: '/teams' },
+  { text: 'Students', icon: <SchoolIcon />, path: '/students' },
+  { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
+  { text: 'Reports', icon: <ReportIcon />, path: '/reports' },
+  { text: 'Settings', icon: <SettingsIcon />, path: '/settings' }
+]
+
+export default function Sidebar() {
+  const navigate = useNavigate()
   const location = useLocation()
-  
-  const isActiveLink = (path: string) => {
-    return location.pathname === path || 
-           (path !== '/' && location.pathname.startsWith(path))
-  }
+  const drawerWidth = 240
 
   return (
-    <div className="hidden md:flex md:flex-shrink-0">
-      <div className="flex flex-col w-64 bg-gray-800">
-        <div className="flex items-center justify-center h-16 bg-gray-900">
-          <span className="text-white font-bold text-lg">GitHub Classroom Tracker</span>
-        </div>
-        <div className="flex flex-col flex-grow px-4 mt-5">
-          <nav className="flex-1 space-y-2">
-            {[
-              { path: '/', icon: 'fa-tachometer-alt', label: 'Dashboard' },
-              { path: '/teams', icon: 'fa-users', label: 'Teams' },
-              { path: '/students', icon: 'fa-user-graduate', label: 'Students' },
-              { path: '/analytics', icon: 'fa-chart-line', label: 'Analytics' },
-              { path: '/reports', icon: 'fa-file-alt', label: 'Reports' },
-              { path: '/settings', icon: 'fa-cog', label: 'Settings' }
-            ].map(({ path, icon, label }) => (
-              <Link 
-                key={path}
-                to={path} 
-                className={`flex items-center px-4 py-2 rounded-md ${
-                  isActiveLink(path) 
-                    ? 'text-white bg-gray-700' 
-                    : 'text-gray-300 hover:bg-gray-700'
-                }`}
-              >
-                <i className={`fas ${icon} mr-3`}></i>
-                <span>{label}</span>
-              </Link>
-            ))}
-          </nav>
-          <div className="mt-auto mb-5">
-            <button className="flex items-center px-4 py-2 text-gray-300 rounded-md hover:bg-gray-700 w-full">
-              <i className="fas fa-sign-out-alt mr-3"></i>
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+    <Drawer
+      variant="permanent"
+      sx={{
+        width: drawerWidth,
+        flexShrink: 0,
+        '& .MuiDrawer-paper': {
+          width: drawerWidth,
+          boxSizing: 'border-box',
+          bgcolor: 'grey.900',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100vh'
+        },
+      }}
+    >
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Header */}
+        <Box sx={{ p: 3, bgcolor: 'grey.900' }}>
+          <Typography variant="h6" sx={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+            GitHub Classroom
+          </Typography>
+        </Box>
+        <Divider sx={{ bgcolor: 'grey.800' }} />
 
-export default Sidebar 
+        {/* Navigation Menu */}
+        <List sx={{ px: 2, py: 1, flex: 1 }}>
+          {menuItems.map((item) => (
+            <ListItem
+              button
+              key={item.text}
+              onClick={() => navigate(item.path)}
+              sx={{
+                borderRadius: 1,
+                mb: 0.5,
+                color: 'grey.300',
+                '&:hover': {
+                  bgcolor: 'grey.800',
+                },
+                ...(location.pathname === item.path && {
+                  bgcolor: 'grey.800',
+                  color: 'white',
+                }),
+              }}
+            >
+              <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItem>
+          ))}
+        </List>
+
+        <Divider sx={{ bgcolor: 'grey.800' }} />
+
+        {/* User Profile Section */}
+        <Box sx={{ p: 2 }}>
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+            <Avatar sx={{ width: 32, height: 32 }}>JW</Avatar>
+            <Box>
+              <Typography variant="subtitle2" sx={{ color: 'white' }}>
+                Dr. Wong, Jane
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'grey.500' }}>
+                Instructor
+              </Typography>
+            </Box>
+          </Stack>
+
+          {/* Logout Button */}
+          <ListItem
+            button
+            onClick={() => navigate('/login')}
+            sx={{
+              borderRadius: 1,
+              color: 'grey.300',
+              '&:hover': {
+                bgcolor: 'grey.800',
+              },
+            }}
+          >
+            <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
+              <LogoutIcon />
+            </ListItemIcon>
+            <ListItemText primary="Logout" />
+          </ListItem>
+        </Box>
+      </Box>
+    </Drawer>
+  )
+} 
