@@ -6,7 +6,8 @@ import Dashboard from './pages/Dashboard'
 import Teams from './pages/Teams'
 import Login from './pages/Login'
 import TeamDetail from './pages/TeamDetail'
-
+import Students from './pages/Students'
+import Settings from './pages/Settings'
 const theme = createTheme({
   palette: {
     mode: 'light',
@@ -29,10 +30,10 @@ function App() {
           <Route path="/teams" element={<Teams />} />
           <Route path="/team/:id" element={<TeamDetail />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/students" element={<div>Students Page</div>} />
+          <Route path="/students" element={<Students />} />
           <Route path="/analytics" element={<div>Analytics Page</div>} />
           <Route path="/reports" element={<div>Reports Page</div>} />
-          <Route path="/settings" element={<div>Settings Page</div>} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<div>404 - Page not found</div>} />
         </Routes>
       </div>

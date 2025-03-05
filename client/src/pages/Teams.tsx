@@ -107,42 +107,6 @@ export default function Teams() {
     <Box sx={{ display: 'flex' }}>
       <Sidebar />
       <Box component="main" sx={{ flexGrow: 1, height: '100vh', overflow: 'auto', bgcolor: 'grey.100' }}>
-        {/* Header */}
-        <Paper sx={{ position: 'sticky', top: 0, zIndex: 1 }}>
-          <Box sx={{ px: 4, py: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <IconButton sx={{ display: { sm: 'none' } }}>
-                  <MenuIcon />
-                </IconButton>
-                <Typography variant="h5" component="h1">
-                  COMP3421 - Software Engineering
-                </Typography>
-              </Stack>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Typography variant="body2" color="text.secondary">
-                  Dr. Wong, Jane
-                </Typography>
-                <Avatar>JW</Avatar>
-              </Stack>
-            </Box>
-            <Divider sx={{ my: 2 }} />
-            <Stack direction="row" spacing={3}>
-              <Typography variant="body2" color="text.secondary">
-                Course Project: Smart Campus App
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Groups: 10
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Students: 45
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Deadline: April 30, 2025
-              </Typography>
-            </Stack>
-          </Box>
-        </Paper>
 
         <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
           {/* Search and Actions */}
