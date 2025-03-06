@@ -89,6 +89,9 @@ npm install
 ```bash
 cd ../server
 npm install
+
+# Initialize MongoDB
+npm run init-db
 ```
 
 4. Create environment variables
