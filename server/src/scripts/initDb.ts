@@ -1,66 +1,87 @@
 import mongoose from 'mongoose'
 import User from '../models/user'
+import Student from '../models/student'
 import Course from '../models/course'
 import Team from '../models/team'
 import { config } from '../config'
+import bcrypt from 'bcrypt'
 
 const initializeDb = async () => {
   try {
     await mongoose.connect(config.mongodb.uri)
     console.log('Connected to MongoDB')
 
-    // 清除现有数据
-    await Promise.all([
-      User.deleteMany({}),
-      Course.deleteMany({}),
-      Team.deleteMany({})
-    ])
+    // 完全删除集合，而不仅仅是文档
+    const db = mongoose.connection.db
+    if (!db) {
+      throw new Error('Database connection not established')
+    }
 
-    // 创建教师用户
-    const teacher = await User.create({
+    const collections = await db.listCollections().toArray()
+    
+    for (const collection of collections) {
+      if (['users', 'students', 'teams', 'courses'].includes(collection.name)) {
+        await db.dropCollection(collection.name)
+        console.log(`Dropped collection: ${collection.name}`)
+      }
+    }
+
+    // 创建用户（教师、助教等）
+    const saltRounds = 10
+    const hashedPassword = await bcrypt.hash('admin123', saltRounds)
+
+    const lecturer = await User.create({
       name: 'Dr. Wong, Jane',
       email: 'jane.wong@example.com',
-      githubId: 'jwong-teacher',
-      role: 'teacher'
+      password: hashedPassword,
+      role: 'lecturer'
     })
 
-    // 创建学生用户
-    const students = await User.insertMany([
+    const tutor = await User.create({
+      name: 'Mr. Lee, John',
+      email: 'john.lee@example.com',
+      password: hashedPassword,
+      role: 'tutor'
+    })
+
+    const assistant = await User.create({
+      name: 'Ms. Zhang, Lucy',
+      email: 'lucy.zhang@example.com',
+      password: hashedPassword,
+      role: 'assistant'
+    })
+
+    // 创建学生
+    const students = await Student.insertMany([
       {
-        name: 'Chan, David',
+        name: 'Master, Fake',
         email: 'david.chan@example.com',
-        githubId: 'dchan-student',
-        role: 'student'
+        githubId: 'qqv'
       },
       {
-        name: 'Wong, Sarah',
+        name: 'Master, Real',
         email: 'sarah.wong@example.com',
-        githubId: 'swong-student',
-        role: 'student'
+        githubId: 'Chris12420'
       },
       {
-        name: 'Li, Jason',
+        name: 'Master, Computing',
         email: 'jason.li@example.com',
-        githubId: 'jli-student',
-        role: 'student'
+        githubId: 'James030913'
       },
       {
-        name: 'Chen, Emily',
+        name: 'Master, AI',
         email: 'emily.chen@example.com',
-        githubId: 'echen-student',
-        role: 'student'
+        githubId: 'lyxsq99'
       },
       {
         name: 'Zhang, Michael',
         email: 'michael.zhang@example.com',
-        githubId: 'mzhang-student',
-        role: 'student'
+        githubId: 'mzhang-student'
       },
       {
         name: 'Wang, Alex',
         email: 'alex.wang@example.com',
-        githubId: 'awang-student',
-        role: 'student'
+        githubId: 'awang-student'
       }
     ])
 
@@ -68,7 +89,7 @@ const initializeDb = async () => {
     const course = await Course.create({
       name: 'COMP3421 - Software Engineering',
       description: 'Learn modern software engineering principles and practices',
-      teacher: teacher._id,
+      teacher: lecturer._id,
       startDate: new Date('2024-01-15'),
       endDate: new Date('2024-05-15'),
       status: 'active'
@@ -78,11 +99,12 @@ const initializeDb = async () => {
     await Team.insertMany([
       {
         name: 'Team Alpha',
-        repositoryUrl: 'https://github.com/comp3421-2024/team-alpha',
+        repositoryUrl: 'https://github.com/qqv/cpt_edu/',
         members: [
           { userId: students[0]._id, role: 'leader' },
           { userId: students[1]._id, role: 'member' },
-          { userId: students[2]._id, role: 'member' }
+          { userId: students[2]._id, role: 'member' },
+          { userId: students[3]._id, role: 'member' },
         ],
         course: course._id
       },
@@ -90,13 +112,11 @@ const initializeDb = async () => {
         name: 'Team Beta',
         repositoryUrl: 'https://github.com/comp3421-2024/team-beta',
         members: [
-          { userId: students[3]._id, role: 'leader' },
-          { userId: students[4]._id, role: 'member' },
+          { userId: students[4]._id, role: 'leader' },
           { userId: students[5]._id, role: 'member' }
         ],
         course: course._id
       }
-      // ... 添加更多团队
     ])
 
     console.log('Database initialized successfully')

@@ -340,6 +340,33 @@ export const GitHubService = {
         };
       });
     }
+  },
+
+  // 添加获取详细提交记录的方法
+  async getRecentCommits(owner: string, repo: string, limit = 10): Promise<any[]> {
+    try {
+      const { data } = await octokit.rest.repos.listCommits({
+        owner,
+        repo,
+        per_page: limit
+      });
+      
+      return data.map(commit => ({
+        id: commit.sha,
+        message: commit.commit.message,
+        author: {
+          name: commit.commit.author?.name || 'Unknown',
+          email: commit.commit.author?.email || '',
+          date: commit.commit.author?.date || new Date().toISOString(),
+          avatar: commit.author?.avatar_url || null,
+          githubId: commit.author?.login || null
+        },
+        url: commit.html_url
+      }));
+    } catch (error) {
+      console.error('Error fetching recent commits:', error);
+      return [];
+    }
   }
 }
 

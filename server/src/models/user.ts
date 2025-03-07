@@ -3,8 +3,8 @@ import { Schema, model } from 'mongoose'
 interface IUser {
   name: string
   email: string
-  githubId: string
-  role: 'teacher' | 'student'
+  password: string
+  role: 'lecturer' | 'tutor' | 'assistant'
 }
 
 const userSchema = new Schema<IUser>({
@@ -17,15 +17,14 @@ const userSchema = new Schema<IUser>({
     required: true,
     unique: true
   },
-  githubId: {
+  password: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   role: {
     type: String,
-    enum: ['teacher', 'student'],
-    default: 'student'
+    enum: ['lecturer', 'tutor', 'assistant'],
+    default: 'lecturer'
   }
 }, {
   timestamps: true

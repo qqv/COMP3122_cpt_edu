@@ -6,6 +6,12 @@ export interface TeamMember {
     avatar: string
     githubId: string
   }
+  user?: {
+    _id: string
+    name: string
+    email: string
+    githubId: string
+  }
   role: 'leader' | 'member'
   contribution?: {
     commits: number

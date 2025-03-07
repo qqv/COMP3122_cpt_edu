@@ -33,7 +33,7 @@ This application helps instructors monitor student group activities and contribu
 
 ### Frontend
 - React.js
-- Tailwind CSS
+- Material UI
 - Chart.js (for analytics visualization)
 - React Query (for data fetching)
 
@@ -130,21 +130,3 @@ npm run dev
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 ```
-
-This README provides a solid foundation for your project. Here's what I've included:
-
-1. A clear project overview and feature list
-2. Detailed tech stack information
-3. Well-organized project structure
-4. Complete setup instructions
-5. Contributing guidelines
-
-To get started with the actual development:
-
-1. First, create the basic folder structure as outlined in the README
-2. Set up the React frontend with Create React App and Tailwind CSS
-3. Initialize the Node.js backend with Express
-4. Set up MongoDB connection
-5. Create initial GitHub API integration
-
-Would you like me to help you set up any specific part of the project structure or create the initial configuration files?

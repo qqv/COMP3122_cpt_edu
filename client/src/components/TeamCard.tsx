@@ -97,11 +97,11 @@ export const TeamCard = ({ team }: TeamCardProps) => {
 
         <Box sx={{ mb: 3 }}>
           <AvatarGroup max={4} sx={{ mb: 2 }}>
-            {team.members.map((member, index) => (
+            {team.members?.map((member) => (
               <Avatar 
-                key={member.userId._id || index}
-                alt={member.userId.name} 
-                src={getGithubAvatarUrl(member.userId.githubId)}
+                key={member.userId?._id} 
+                src={getGithubAvatarUrl(member.userId?.githubId)}
+                alt={member.userId?.name}
               />
             ))}
           </AvatarGroup>

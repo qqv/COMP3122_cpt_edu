@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { GitHubService } from '../services/github.service'
 import Team from '../models/team'
-import User from '../models/user'
+import Student from '../models/student'
 import type { Request, Response } from 'express'
 
 const router = Router()
@@ -51,7 +51,7 @@ router.get('/team/:teamId', async (req: Request, res: Response) => {
 router.get('/user/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params
-    const user = await User.findById(userId)
+    const user = await Student.findById(userId)
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' })

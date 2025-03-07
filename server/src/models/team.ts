@@ -24,7 +24,7 @@ const teamSchema = new Schema<ITeam>({
   members: [{
     userId: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Student',
       required: true
     },
     role: {

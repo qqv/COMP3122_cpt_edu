@@ -4,6 +4,7 @@ import { AppError } from '../middleware/error'
 import type { Request, Response, NextFunction } from 'express'
 import { GitHubService } from '../services/github.service'
 import { UserService } from '../services/user.service'
+import Student from '../models/student'
 
 const router = Router()
 
@@ -11,14 +12,14 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const teams = await Team.find().populate('course').lean()
 
-    // 获取所有用户ID
-    const userIds = teams.flatMap(team => 
+    // 获取所有学生ID
+    const studentIds = teams.flatMap(team => 
       team.members.map(member => member.userId.toString())
     )
 
-    // 批量获取缓存的用户信息
-    const users = await UserService.getUsersWithCache(userIds)
-    const userMap = new Map(users.map(user => [user._id.toString(), user]))
+    // 批量获取学生信息
+    const students = await Student.find({ _id: { $in: studentIds } }).lean()
+    const studentMap = new Map(students.map(student => [student._id.toString(), student]))
 
     // 批量获取GitHub统计数据
     const teamsWithStats = await Promise.all(
@@ -30,10 +31,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           
           const stats = await GitHubService.getRepoStats(owner, repo)
           
-          // 添加用户信息
+          // 添加学生信息
           const membersWithDetails = team.members.map(member => ({
             ...member,
-            user: userMap.get(member.userId.toString())
+            user: studentMap.get(member.userId.toString())
           }))
 
           return {
@@ -129,6 +130,9 @@ router.get('/:id/stats', async (req: Request, res: Response, next: NextFunction)
       // 获取仓库统计数据
       const repoStats = await GitHubService.getRepoStats(owner, repo);
       
+      // 获取最近的提交记录
+      const recentCommits = await GitHubService.getRecentCommits(owner, repo, 10);
+      
       // 返回完整数据
       const stats = {
         teamId: team._id,
@@ -142,7 +146,8 @@ router.get('/:id/stats', async (req: Request, res: Response, next: NextFunction)
           totalPRs: repoStats.prs || 0,
           issues: repoStats.issues || 0,
           reviews: repoStats.reviews || 0
-        }
+        },
+        recentActivity: recentCommits
       };
       
       console.log("Returning stats with real GitHub data");
@@ -180,6 +185,20 @@ router.get('/:id/stats', async (req: Request, res: Response, next: NextFunction)
         };
       });
       
+      // 获取最近的提交记录
+      const mockRecentCommits = Array.from({ length: 10 }, (_, i) => ({
+        id: `mock-commit-${i + 1}`,
+        message: `Mock commit message ${i + 1}`,
+        author: {
+          name: `Mock Author ${i + 1}`,
+          email: `mock-author${i + 1}@example.com`,
+          date: new Date(Date.now() - i * 86400000).toISOString(),
+          avatar: null,
+          githubId: null
+        },
+        url: `https://github.com/mock-repo/commit/${i + 1}`
+      }));
+      
       // 获取统计数据
       const stats = {
         teamId: team._id,
@@ -193,7 +212,8 @@ router.get('/:id/stats', async (req: Request, res: Response, next: NextFunction)
           totalPRs: mockMemberStats.reduce((sum, m) => sum + m.contribution.prs, 0),
           issues: Math.floor(Math.random() * 20),
           reviews: Math.floor(Math.random() * 15)
-        }
+        },
+        recentActivity: mockRecentCommits
       };
       
       console.log("Returning stats with mock data");
@@ -228,15 +248,20 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 })
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const team = await Team.findByIdAndDelete(req.params.id)
+    const teamId = req.params.id;
+    
+    // 查找并删除团队
+    const team = await Team.findByIdAndDelete(teamId);
+    
     if (!team) {
-      return res.status(404).json({ message: 'Team not found' })
+      return next(new AppError('Team not found', 404));
     }
-    res.json({ message: 'Team deleted successfully' })
+    
+    res.status(200).json({ message: 'Team deleted successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Error deleting team' })
+    next(new AppError('Failed to delete team', 500));
   }
 })
 
@@ -258,5 +283,112 @@ router.get('/name/:name', async (req: Request, res: Response, next: NextFunction
     next(new AppError('Failed to fetch team', 500))
   }
 })
+
+// 修改路由路径
+router.get('/api/students/available', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // 获取所有学生
+    const students = await Student.find().lean();
+    
+    // 获取所有团队成员的学生ID
+    const teams = await Team.find().lean();
+    const teamMemberIds = new Set(
+      teams.flatMap(team => team.members.map(member => member.userId.toString()))
+    );
+    
+    // 过滤出未分配到团队的学生
+    const availableStudents = students.filter(student => 
+      !teamMemberIds.has(student._id.toString())
+    );
+    
+    res.json(availableStudents);
+  } catch (error) {
+    next(new AppError('Failed to fetch available students', 500));
+  }
+});
+
+// 添加团队成员的路由
+router.post('/:id/members', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { studentId } = req.body;
+    
+    if (!studentId) {
+      return next(new AppError('Student ID is required', 400));
+    }
+    
+    // 查找团队
+    const team = await Team.findById(req.params.id);
+    
+    if (!team) {
+      return next(new AppError('Team not found', 404));
+    }
+    
+    // 检查学生是否已经是团队成员
+    const isAlreadyMember = team.members.some(
+      member => member.userId.toString() === studentId
+    );
+    
+    if (isAlreadyMember) {
+      return next(new AppError('Student is already a team member', 400));
+    }
+    
+    // 添加新成员
+    team.members.push({
+      userId: studentId,
+      role: 'member'
+    });
+    
+    await team.save();
+    
+    res.status(200).json({ message: 'Member added successfully' });
+  } catch (error) {
+    next(new AppError('Failed to add team member', 500));
+  }
+});
+
+// 更改团队领导的路由
+router.put('/:id/leader', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { newLeaderId } = req.body;
+    
+    if (!newLeaderId) {
+      return next(new AppError('New leader ID is required', 400));
+    }
+    
+    // 查找团队
+    const team = await Team.findById(req.params.id);
+    
+    if (!team) {
+      return next(new AppError('Team not found', 404));
+    }
+    
+    // 检查新领导是否是团队成员
+    const newLeaderIndex = team.members.findIndex(
+      member => member.userId.toString() === newLeaderId
+    );
+    
+    if (newLeaderIndex === -1) {
+      return next(new AppError('New leader must be a team member', 400));
+    }
+    
+    // 找到当前领导
+    const currentLeaderIndex = team.members.findIndex(
+      member => member.role === 'leader'
+    );
+    
+    // 更新角色
+    if (currentLeaderIndex !== -1) {
+      team.members[currentLeaderIndex].role = 'member';
+    }
+    
+    team.members[newLeaderIndex].role = 'leader';
+    
+    await team.save();
+    
+    res.status(200).json({ message: 'Team leader changed successfully' });
+  } catch (error) {
+    next(new AppError('Failed to change team leader', 500));
+  }
+});
 
 export default router 

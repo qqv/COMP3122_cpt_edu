@@ -64,5 +64,61 @@ export const teamService = {
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to fetch team')
     }
+  },
+
+  deleteTeam: async (id: string) => {
+    try {
+      await api.delete(`/teams/${id}`);
+      return true;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to delete team');
+    }
+  },
+
+  getAvailableStudents: async () => {
+    try {
+      const { data } = await api.get('/teams/students/available');
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch available students');
+    }
+  },
+
+  addTeamMember: async (teamId: string, studentId: string) => {
+    try {
+      const { data } = await api.post(`/teams/${teamId}/members`, { studentId });
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to add team member');
+    }
+  },
+
+  changeTeamLeader: async (teamId: string, newLeaderId: string) => {
+    try {
+      const { data } = await api.put(`/teams/${teamId}/leader`, { newLeaderId });
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to change team leader');
+    }
+  }
+}
+
+export const courseService = {
+  getAllCourses: async () => {
+    try {
+      const response = await api.get('/courses');
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch courses');
+    }
+  },
+  
+  getCourseById: async (courseId: string) => {
+    try {
+      const response = await api.get(`/courses/${courseId}`);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch course');
+    }
   }
 } 
