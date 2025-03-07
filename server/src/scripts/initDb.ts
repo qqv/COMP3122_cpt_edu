@@ -21,8 +21,7 @@ const initializeDb = async () => {
       name: 'Dr. Wong, Jane',
       email: 'jane.wong@example.com',
       githubId: 'jwong-teacher',
-      role: 'teacher',
-      avatar: 'https://avatars.githubusercontent.com/u/1234567'
+      role: 'teacher'
     })
 
     // 创建学生用户
@@ -31,43 +30,37 @@ const initializeDb = async () => {
         name: 'Chan, David',
         email: 'david.chan@example.com',
         githubId: 'dchan-student',
-        role: 'student',
-        avatar: 'https://avatars.githubusercontent.com/u/2345671'
+        role: 'student'
       },
       {
         name: 'Wong, Sarah',
         email: 'sarah.wong@example.com',
         githubId: 'swong-student',
-        role: 'student',
-        avatar: 'https://avatars.githubusercontent.com/u/2345672'
+        role: 'student'
       },
       {
         name: 'Li, Jason',
         email: 'jason.li@example.com',
         githubId: 'jli-student',
-        role: 'student',
-        avatar: 'https://avatars.githubusercontent.com/u/2345673'
+        role: 'student'
       },
       {
         name: 'Chen, Emily',
         email: 'emily.chen@example.com',
         githubId: 'echen-student',
-        role: 'student',
-        avatar: 'https://avatars.githubusercontent.com/u/2345674'
+        role: 'student'
       },
       {
         name: 'Zhang, Michael',
         email: 'michael.zhang@example.com',
         githubId: 'mzhang-student',
-        role: 'student',
-        avatar: 'https://avatars.githubusercontent.com/u/2345675'
+        role: 'student'
       },
       {
         name: 'Wang, Alex',
         email: 'alex.wang@example.com',
         githubId: 'awang-student',
-        role: 'student',
-        avatar: 'https://avatars.githubusercontent.com/u/2345676'
+        role: 'student'
       }
     ])
 
@@ -85,7 +78,6 @@ const initializeDb = async () => {
     await Team.insertMany([
       {
         name: 'Team Alpha',
-        description: 'Frontend Development Team',
         repositoryUrl: 'https://github.com/comp3421-2024/team-alpha',
         members: [
           { userId: students[0]._id, role: 'leader' },
@@ -96,7 +88,6 @@ const initializeDb = async () => {
       },
       {
         name: 'Team Beta',
-        description: 'Backend Development Team',
         repositoryUrl: 'https://github.com/comp3421-2024/team-beta',
         members: [
           { userId: students[3]._id, role: 'leader' },

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import {
   Box,
   Container,
@@ -18,7 +18,8 @@ import {
   TableHead,
   TableRow,
   IconButton,
-  Divider
+  Divider,
+  CircularProgress
 } from '@mui/material'
 import {
   Home as HomeIcon,
@@ -33,22 +34,120 @@ import {
 } from '@mui/icons-material'
 import { LineChart, PieChart } from '@mui/x-charts'
 import Sidebar from '../components/Sidebar'
-
-// 团队数据
-const teamData = {
-  name: "Team Alpha",
-  status: "On Track",
-  project: "Mobile App for Campus Navigation",
-  repository: "github.com/comp3421-2025/team-alpha",
-  progress: 85,
-  members: 5,
-  commits: 142,
-  issues: 38,
-  prs: 24,
-  reviews: 31
-}
+import { useParams } from 'react-router-dom'
+import { teamService } from '../services/api'
+import ErrorPage from './ErrorPage'
+import { getGithubAvatarUrl } from '../utils/github'
+import { TeamDetails } from '../types/team'
+import { formatLastActive } from '../utils/dateFormat'
 
 export default function TeamDetail() {
+  const { id } = useParams()
+  const [team, setTeam] = useState<TeamDetails | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchTeamDetails = async () => {
+      try {
+        setLoading(true)
+        const data = await teamService.getTeamDetails(id!)
+        setTeam(data)
+        setError(null)
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (id) {
+      fetchTeamDetails()
+    }
+  }, [id])
+
+  const activityData = useMemo(() => {
+    if (!team?.analytics?.commitActivity) return []
+    
+    return team.analytics.commitActivity.map(item => ({
+      date: new Date(item.date).toLocaleDateString(),
+      commits: item.count
+    }))
+  }, [team])
+
+  const contributionData = useMemo(() => {
+    if (!team?.memberStats) return []
+    
+    return team.memberStats.map(member => ({
+      id: member.userId._id,
+      label: member.userId.name,
+      value: member.contribution.commits,
+      color: `hsl(${Math.random() * 360}, 70%, 50%)`
+    }))
+  }, [team])
+
+  const getMailtoLink = () => {
+    if (!team) return '#'
+    
+    const emails = team.memberStats
+      .map(member => member.userId.email)
+      .join(',')
+    return `mailto:${emails}?subject=Regarding ${team.name}&body=Hello team,`
+  }
+
+  const handleExportData = () => {
+    if (!team) return
+    
+    const data = {
+      teamName: team.name,
+      repository: team.repositoryUrl,
+      members: team.memberStats.map(member => ({
+        name: member.userId.name,
+        email: member.userId.email,
+        role: member.role,
+        commits: member.contribution.commits,
+        additions: member.contribution.additions,
+        deletions: member.contribution.deletions,
+        lastActive: member.contribution.lastCommit
+      }))
+    }
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${team.name.toLowerCase()}-stats.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  if (loading) {
+    return (
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '100vh' 
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    )
+  }
+
+  if (error || !team) {
+    return (
+      <ErrorPage 
+        code={404}
+        title="Team Not Found"
+        message={error || 'The requested team could not be found.'}
+      />
+    )
+  }
+
   return (
     <Box sx={{ display: 'flex' }}>
       <Sidebar />
@@ -56,7 +155,24 @@ export default function TeamDetail() {
         {/* Header */}
         <Paper sx={{ position: 'sticky', top: 0, zIndex: 1 }}>
           <Box sx={{ px: 4, py: 3 }}>
-            {/* ... 课程信息头部，与 Teams 页面相同 ... */}
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <Typography variant="h5" component="h1" sx={{ mr: 2 }}>
+                {team.name}
+              </Typography>
+              <Chip
+                label={team.exists ? 'Active' : 'Repository Not Found'}
+                color={team.exists ? 'success' : 'error'}
+                size="small"
+              />
+            </Box>
+            <Typography color="text.secondary" gutterBottom>
+              Course: {team.course.name}
+            </Typography>
+            <Typography color="text.secondary">
+              Repository: <Link href={team.repositoryUrl} target="_blank" underline="hover">
+                {team.repositoryUrl.replace('https://github.com/', '')}
+              </Link>
+            </Typography>
           </Box>
           <Divider />
           <Box sx={{ px: 4, py: 2 }}>
@@ -78,95 +194,6 @@ export default function TeamDetail() {
         </Paper>
 
         <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-          {/* Team Header Card */}
-          <Paper sx={{ p: 3, mb: 3 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={8}>
-                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                  <Avatar
-                    sx={{ 
-                      width: 56, 
-                      height: 56, 
-                      bgcolor: 'primary.light',
-                      mr: 2
-                    }}
-                  >
-                    <GroupIcon sx={{ fontSize: 30 }} />
-                  </Avatar>
-                  <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                      <Typography variant="h5" component="h1" sx={{ mr: 2 }}>
-                        {teamData.name}
-                      </Typography>
-                      <Chip
-                        label={teamData.status}
-                        color="success"
-                        size="small"
-                      />
-                    </Box>
-                    <Typography color="text.secondary" gutterBottom>
-                      Project: {teamData.project}
-                    </Typography>
-                    <Typography color="text.secondary">
-                      Repository: <Link href="#" underline="hover">{teamData.repository}</Link>
-                    </Typography>
-                  </Box>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                  <Stack
-                    direction="row"
-                    spacing={3}
-                    divider={<Divider orientation="vertical" flexItem />}
-                    sx={{ mb: 2 }}
-                  >
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="h4" color="primary.main">
-                        {teamData.progress}%
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Progress
-                      </Typography>
-                    </Box>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="h4" color="primary.main">
-                        {teamData.members}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Members
-                      </Typography>
-                    </Box>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="h4" color="primary.main">
-                        {teamData.commits}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Commits
-                      </Typography>
-                    </Box>
-                  </Stack>
-                  <Stack direction="row" spacing={1}>
-                    <Button
-                      variant="contained"
-                      startIcon={<EmailIcon />}
-                      size="small"
-                    >
-                      Contact Team
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      startIcon={<DownloadIcon />}
-                      size="small"
-                    >
-                      Export Data
-                    </Button>
-                  </Stack>
-                </Paper>
-              </Grid>
-            </Grid>
-          </Paper>
-
           {/* Metrics Cards */}
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid item xs={12} sm={6} md={3}>
@@ -177,7 +204,7 @@ export default function TeamDetail() {
                       Total Commits
                     </Typography>
                     <Typography variant="h4">
-                      {teamData.commits}
+                      {team.commits}
                     </Typography>
                   </Box>
                   <Avatar sx={{ bgcolor: 'primary.light' }}>
@@ -205,7 +232,7 @@ export default function TeamDetail() {
                       Issues Closed
                     </Typography>
                     <Typography variant="h4">
-                      {teamData.issues}
+                      {team.issues}
                     </Typography>
                   </Box>
                   <Avatar sx={{ bgcolor: 'success.light' }}>
@@ -233,7 +260,7 @@ export default function TeamDetail() {
                       Pull Requests
                     </Typography>
                     <Typography variant="h4">
-                      {teamData.prs}
+                      {team.prs}
                     </Typography>
                   </Box>
                   <Avatar sx={{ bgcolor: 'warning.light' }}>
@@ -261,7 +288,7 @@ export default function TeamDetail() {
                       Code Reviews
                     </Typography>
                     <Typography variant="h4">
-                      {teamData.reviews}
+                      {team.reviews}
                     </Typography>
                   </Box>
                   <Avatar sx={{ bgcolor: 'error.light' }}>
@@ -293,13 +320,13 @@ export default function TeamDetail() {
                   <LineChart
                     series={[
                       {
-                        data: [12, 15, 8, 19, 22, 14, 10],
+                        data: activityData.map(item => item.commits),
                         label: 'Commits',
                         color: 'primary.main'
                       }
                     ]}
                     xAxis={[{
-                      data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                      data: activityData.map(item => item.date),
                       scaleType: 'band',
                     }]}
                     height={250}
@@ -315,33 +342,11 @@ export default function TeamDetail() {
                 <Box sx={{ height: 300 }}>
                   <PieChart
                     series={[{
-                      data: [
-                        { value: 32, label: 'Chan, David' },
-                        { value: 27, label: 'Wong, Sarah' },
-                        { value: 22, label: 'Chen, Emily' },
-                        { value: 16, label: 'Li, Jason' },
-                        { value: 3, label: 'Zhang, Michael' }
-                      ],
-                      innerRadius: 30,
-                      paddingAngle: 2,
-                      cornerRadius: 4
+                      data: contributionData,
+                      highlightScope: { faded: 'global', highlighted: 'item' },
+                      faded: { innerRadius: 30, additionalRadius: -30 }
                     }]}
                     height={250}
-                    margin={{ top: 10, bottom: 50 }}
-                    slotProps={{
-                      legend: {
-                        direction: 'row',
-                        position: { vertical: 'bottom', horizontal: 'middle' },
-                        padding: 0,
-                        itemMarkWidth: 8,
-                        itemMarkHeight: 8,
-                        markGap: 5,
-                        itemGap: 12,
-                        labelStyle: {
-                          fontSize: 11
-                        }
-                      }
-                    }}
                   />
                 </Box>
               </Paper>
@@ -372,45 +377,33 @@ export default function TeamDetail() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {[
-                  {
-                    name: 'Chan, David',
-                    email: 'david.chan@polyu.edu.hk',
-                    role: 'Team Lead',
-                    subRole: 'Frontend',
-                    commits: 45,
-                    prs: 12,
-                    lastActive: '2h ago',
-                    status: 'Active'
-                  },
-                  // ... 其他成员数据
-                ].map((member) => (
-                  <TableRow key={member.name}>
+                {team.memberStats.map((member) => (
+                  <TableRow key={member.userId._id}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ mr: 2 }} />
+                        <Avatar 
+                          sx={{ mr: 2 }} 
+                          src={getGithubAvatarUrl(member.userId.githubId)}
+                        />
                         <Box>
-                          <Typography variant="body2">{member.name}</Typography>
+                          <Typography variant="body2">{member.userId.name}</Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {member.email}
+                            {member.userId.email}
                           </Typography>
                         </Box>
                       </Box>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">{member.role}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {member.subRole}
-                      </Typography>
                     </TableCell>
-                    <TableCell>{member.commits}</TableCell>
-                    <TableCell>{member.prs}</TableCell>
-                    <TableCell>{member.lastActive}</TableCell>
+                    <TableCell>{member.contribution.commits}</TableCell>
+                    <TableCell>{member.contribution.prs || 0}</TableCell>
+                    <TableCell>{formatLastActive(member.contribution.lastCommit || '')}</TableCell>
                     <TableCell>
                       <Chip
-                        label={member.status}
+                        label={member.contribution.lastCommit ? 'Active' : 'Inactive'}
                         size="small"
-                        color={member.status === 'Active' ? 'success' : 'warning'}
+                        color={member.contribution.lastCommit ? 'success' : 'warning'}
                       />
                     </TableCell>
                   </TableRow>
@@ -433,101 +426,58 @@ export default function TeamDetail() {
                   </Box>
                 </Box>
                 <Stack spacing={3} sx={{ maxHeight: 'calc(100% - 60px)', overflow: 'auto' }}>
-                  {[
-                    {
-                      type: 'commit',
-                      user: 'Chan, David',
-                      action: 'pushed 3 commits',
-                      target: 'main',
-                      time: '2h ago',
-                      details: [
-                        'Fix navigation bug in campus map view',
-                        'Update UI components for better responsiveness',
-                        'Add unit tests for location services'
-                      ]
-                    },
-                    // ... 其他活动数据
-                  ].map((activity, index) => (
-                    <Box key={index}>
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                        <Avatar sx={{ mr: 2 }} />
-                        <Box>
-                          <Typography variant="body2">
-                            <Link href="#" underline="hover" color="inherit">
-                              {activity.user}
-                            </Link>
-                            {' '}{activity.action} to{' '}
-                            <Link href="#" underline="hover" color="inherit">
-                              {activity.target}
-                            </Link>
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                            {activity.time}
-                          </Typography>
-                          {activity.details && (
+                  {team.memberStats.map((member) => 
+                    member.contribution.lastCommit && (
+                      <Box key={member.userId._id}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                          <Avatar 
+                            sx={{ mr: 2 }} 
+                            src={getGithubAvatarUrl(member.userId.githubId)}
+                          />
+                          <Box>
+                            <Typography variant="body2">
+                              <Link href="#" underline="hover" color="inherit">
+                                {member.userId.name}
+                              </Link>
+                              {' made '}{member.contribution.commits} commits
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                              {formatLastActive(member.contribution.lastCommit)}
+                            </Typography>
                             <Box sx={{ mt: 1, bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                              {activity.details.map((detail, i) => (
-                                <Typography key={i} variant="caption" display="block" sx={{ fontFamily: 'monospace' }}>
-                                  + {detail}
-                                </Typography>
-                              ))}
+                              <Typography variant="caption" display="block" sx={{ fontFamily: 'monospace' }}>
+                                + Added {member.contribution.additions} lines
+                              </Typography>
+                              <Typography variant="caption" display="block" sx={{ fontFamily: 'monospace' }}>
+                                - Removed {member.contribution.deletions} lines
+                              </Typography>
                             </Box>
-                          )}
+                          </Box>
                         </Box>
                       </Box>
-                    </Box>
-                  ))}
+                    )
+                  )}
                 </Stack>
               </Paper>
             </Grid>
 
             <Grid item xs={12} lg={6}>
               <Paper sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>Student Performance</Typography>
+                <Typography variant="h6" gutterBottom>Team Progress</Typography>
                 <Stack spacing={3}>
-                  {[
-                    {
-                      name: 'Chan, David',
-                      role: 'Team Lead',
-                      metrics: {
-                        participation: 90,
-                        collaboration: 92
-                      }
-                    },
-                    {
-                      name: 'Wong, Sarah',
-                      role: 'Developer',
-                      metrics: {
-                        participation: 85,
-                        collaboration: 85
-                      }
-                    },
-                    {
-                      name: 'Chen, Emily',
-                      role: 'Developer',
-                      metrics: {
-                        participation: 88,
-                        collaboration: 90
-                      }
-                    },
-                    {
-                      name: 'Li, Jason',
-                      role: 'Developer',
-                      metrics: {
-                        participation: 75,
-                        collaboration: 82
-                      }
-                    }
-                  ].map((student) => (
-                    <Box key={student.name}>
+                  {team.memberStats.map((member) => (
+                    <Box key={member.userId._id}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                        <Avatar sx={{ mr: 2 }} />
+                        <Avatar 
+                          sx={{ mr: 2 }} 
+                          src={getGithubAvatarUrl(member.userId.githubId)}
+                        />
                         <Box>
                           <Typography variant="body2" fontWeight="medium">
-                            {student.name}
+                            {member.userId.name}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {student.role}
+                            {member.role}
                           </Typography>
                         </Box>
                       </Box>
@@ -535,43 +485,21 @@ export default function TeamDetail() {
                         <Box>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                             <Typography variant="caption" color="text.secondary">
-                              Participation
+                              Contribution
                             </Typography>
                             <Typography variant="caption" fontWeight="medium">
-                              {student.metrics.participation}%
+                              {((member.contribution.commits / team.commits) * 100).toFixed(1)}%
                             </Typography>
                           </Box>
                           <LinearProgress
                             variant="determinate"
-                            value={student.metrics.participation}
+                            value={(member.contribution.commits / team.commits) * 100}
                             sx={{
                               height: 6,
                               borderRadius: 3,
                               bgcolor: 'grey.100',
                               '& .MuiLinearProgress-bar': {
                                 bgcolor: 'success.main'
-                              }
-                            }}
-                          />
-                        </Box>
-                        <Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                            <Typography variant="caption" color="text.secondary">
-                              Collaboration
-                            </Typography>
-                            <Typography variant="caption" fontWeight="medium">
-                              {student.metrics.collaboration}%
-                            </Typography>
-                          </Box>
-                          <LinearProgress
-                            variant="determinate"
-                            value={student.metrics.collaboration}
-                            sx={{
-                              height: 6,
-                              borderRadius: 3,
-                              bgcolor: 'grey.100',
-                              '& .MuiLinearProgress-bar': {
-                                bgcolor: 'info.main'
                               }
                             }}
                           />
@@ -584,6 +512,18 @@ export default function TeamDetail() {
               </Paper>
             </Grid>
           </Grid>
+
+          {/* Export Data Button */}
+          <Paper sx={{ p: 3, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              size="small"
+              onClick={handleExportData}
+            >
+              Export Data
+            </Button>
+          </Paper>
         </Container>
       </Box>
     </Box>

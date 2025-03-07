@@ -4,6 +4,8 @@ import cors from 'cors'
 import helmet from 'helmet'
 import dotenv from 'dotenv'
 import { config } from './config'
+import { errorHandler } from './middleware/error'
+import './utils/warnings'
 
 import userRoutes from './routes/user'
 import teamRoutes from './routes/team'
@@ -12,15 +14,57 @@ import analyticsRoutes from './routes/analytics'
 
 dotenv.config()
 
+// 禁用 punycode 警告
+process.removeAllListeners('warning')
+process.on('warning', (warning) => {
+  if (warning.name === 'DeprecationWarning' && 
+      warning.message.includes('punycode')) {
+    return
+  }
+  console.warn(warning)
+})
+
+// 在应用启动时检查必要的环境变量
+const requiredEnvVars = ['GITHUB_TOKEN', 'MONGODB_URI']
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar])
+
+if (missingEnvVars.length > 0) {
+  console.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`)
+  process.exit(1)
+}
+
 const app = express()
 
 // Middleware
-app.use(cors())
+// 允许多个源
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',  // Vite 默认端口
+  'http://localhost:4173'   // Vite preview 端口
+]
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // 允许没有 origin 的请求（比如开发工具或 Postman）
+    if (!origin) return callback(null, true)
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}))
 app.use(helmet())
 app.use(express.json())
 
 // Database connection
-mongoose.connect(config.mongodb.uri)
+mongoose.connect(config.mongodb.uri, {
+  // 不再需要 useNewUrlParser 和 useUnifiedTopology
+})
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => console.error('MongoDB connection error:', err))
 
@@ -31,10 +75,7 @@ app.use('/api/courses', courseRoutes)
 app.use('/api/analytics', analyticsRoutes)
 
 // Error handling
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack)
-  res.status(500).json({ message: 'Something went wrong!' })
-})
+app.use(errorHandler)
 
 app.listen(config.server.port, () => {
   console.log(`Server is running on port ${config.server.port}`)

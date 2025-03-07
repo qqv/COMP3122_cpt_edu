@@ -1,6 +1,13 @@
-import mongoose from 'mongoose'
+import { Schema, model } from 'mongoose'
 
-const userSchema = new mongoose.Schema({
+interface IUser {
+  name: string
+  email: string
+  githubId: string
+  role: 'teacher' | 'student'
+}
+
+const userSchema = new Schema<IUser>({
   name: {
     type: String,
     required: true
@@ -17,12 +24,11 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'teacher', 'admin'],
+    enum: ['teacher', 'student'],
     default: 'student'
-  },
-  avatar: String
+  }
 }, {
   timestamps: true
 })
 
-export default mongoose.model('User', userSchema) 
+export default model<IUser>('User', userSchema) 

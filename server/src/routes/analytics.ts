@@ -19,7 +19,7 @@ router.get('/team/:teamId', async (req: Request, res: Response) => {
       .replace('https://github.com/', '')
       .split('/')
 
-    const teamStats = await GitHubService.getRepositoryStats(owner, repo)
+    const teamStats = await GitHubService.getRepoStats(owner, repo)
 
     const memberContributions = await Promise.all(
       team.members.map(async (member) => {

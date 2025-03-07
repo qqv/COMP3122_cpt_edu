@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   Box,
   Container,
@@ -16,7 +16,9 @@ import {
   Divider,
   TextField,
   Button,
-  InputAdornment
+  InputAdornment,
+  Alert,
+  CircularProgress
 } from '@mui/material'
 import {
   MoreVert as MoreVertIcon,
@@ -30,78 +32,69 @@ import {
 } from '@mui/icons-material'
 import Sidebar from '../components/Sidebar'
 import { useNavigate } from 'react-router-dom'
+import { teamService } from '../services/api'
+import { formatLastActive } from '../utils/dateFormat'
+import { getActivityStatus } from '../utils/activity'
+import { TeamCard } from '../components/TeamCard'
 
-const teams = [
-  {
-    name: "Team Alpha",
-    members: [
-      { name: "Chan, David", avatar: "/api/placeholder/32/32" },
-      { name: "Wong, Sarah", avatar: "/api/placeholder/32/32" },
-      { name: "Li, Jason", avatar: "/api/placeholder/32/32" },
-      { name: "Chen, Emily", avatar: "/api/placeholder/32/32" },
-      { name: "Zhang, Michael", avatar: "/api/placeholder/32/32" }
-    ],
-    commits: 142,
-    issues: 38,
-    prs: 24,
-    progress: 85,
-    status: "On Track",
-    lastActive: "2h ago",
-    description: "Frontend Development Team"
-  },
-  {
-    name: "Team Beta",
-    members: [
-      { name: "Wang, Alex", avatar: "/api/placeholder/32/32" },
-      { name: "Liu, Anna", avatar: "/api/placeholder/32/32" },
-      { name: "Kumar, Raj", avatar: "/api/placeholder/32/32" },
-      { name: "Park, Jin", avatar: "/api/placeholder/32/32" }
-    ],
-    commits: 98,
-    issues: 27,
-    prs: 15,
-    progress: 72,
-    status: "On Track",
-    lastActive: "1d ago",
-    description: "Backend Development Team"
-  },
-  {
-    name: "Team Gamma",
-    members: [
-      { name: "Smith, John", avatar: "/api/placeholder/32/32" },
-      { name: "Johnson, Emma", avatar: "/api/placeholder/32/32" },
-      { name: "Brown, Mike", avatar: "/api/placeholder/32/32" },
-      { name: "Davis, Sophie", avatar: "/api/placeholder/32/32" },
-      { name: "Wilson, Tom", avatar: "/api/placeholder/32/32" }
-    ],
-    commits: 165,
-    issues: 42,
-    prs: 21,
-    progress: 90,
-    status: "On Track",
-    lastActive: "5h ago",
-    description: "Mobile Development Team"
-  },
-  {
-    name: "Team Delta",
-    members: [
-      { name: "Lee, Kevin", avatar: "/api/placeholder/32/32" },
-      { name: "Kim, Grace", avatar: "/api/placeholder/32/32" },
-      { name: "Tan, Marcus", avatar: "/api/placeholder/32/32" },
-      { name: "Wu, Linda", avatar: "/api/placeholder/32/32" }
-    ],
-    commits: 87,
-    issues: 19,
-    prs: 8,
-    progress: 45,
-    status: "Warning",
-    lastActive: "3d ago",
-    description: "DevOps Team"
-  }
-]
+const getActivityColor = (index: number) => {
+  const colors = ['#4CAF50', '#2196F3', '#FF9800', '#F44336'] // 绿、蓝、橙、红
+  return colors[index % colors.length]
+}
 
 export default function Teams() {
+  const [teams, setTeams] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const fetchTeams = async () => {
+      try {
+        const data = await teamService.getTeams()
+        setTeams(data)
+        setError(null)
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTeams()
+  }, [])
+
+  const sortedTeams = useMemo(() => {
+    return [...teams].sort((a, b) => {
+      // 首先按仓库存在状态排序
+      if (!a.exists && b.exists) return -1
+      if (a.exists && !b.exists) return 1
+      
+      // 如果存在状态相同，按最后活动时间排序
+      if (a.exists && b.exists) {
+        return new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime()
+      }
+      
+      // 如果都不存在，按名称排序
+      return a.name.localeCompare(b.name)
+    })
+  }, [teams])
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    )
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    )
+  }
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -134,101 +127,9 @@ export default function Teams() {
 
           {/* Teams Grid */}
           <Grid container spacing={3}>
-            {teams.map((team) => (
-              <Grid item xs={12} md={6} lg={4} key={team.name}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                      <Box>
-                        <Typography variant="h6" gutterBottom>
-                          {team.name}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          {team.description}
-                        </Typography>
-                      </Box>
-                      <IconButton>
-                        <MoreVertIcon />
-                      </IconButton>
-                    </Box>
-
-                    <Box sx={{ mb: 3 }}>
-                      <AvatarGroup max={5} sx={{ justifyContent: 'flex-start' }}>
-                        {team.members.map((member) => (
-                          <Avatar key={member.name} src={member.avatar} />
-                        ))}
-                      </AvatarGroup>
-                    </Box>
-
-                    <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
-                      <Chip
-                        icon={<CodeIcon />}
-                        label={`${team.commits} commits`}
-                        size="small"
-                      />
-                      <Chip
-                        icon={<BugReportIcon />}
-                        label={`${team.issues} issues`}
-                        size="small"
-                      />
-                      <Chip
-                        icon={<MergeTypeIcon />}
-                        label={`${team.prs} PRs`}
-                        size="small"
-                      />
-                    </Stack>
-
-                    <Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          Progress
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {team.progress}%
-                        </Typography>
-                      </Box>
-                      <LinearProgress
-                        variant="determinate"
-                        value={team.progress}
-                        sx={{
-                          height: 6,
-                          borderRadius: 3,
-                          bgcolor: 'grey.100',
-                          '& .MuiLinearProgress-bar': {
-                            bgcolor: team.progress > 75 ? 'success.main' :
-                                    team.progress > 50 ? 'primary.main' :
-                                    team.progress > 25 ? 'warning.main' : 'error.main'
-                          }
-                        }}
-                      />
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                        <Chip
-                          label={team.status}
-                          size="small"
-                          color={
-                            team.status === "On Track" ? "success" :
-                            team.status === "Warning" ? "warning" : "error"
-                          }
-                        />
-                        <Typography variant="caption" color="text.secondary">
-                          Last active: {team.lastActive}
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    <Divider sx={{ my: 2 }} />
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                      <Button
-                        endIcon={<ArrowForwardIcon />}
-                        onClick={() => navigate(`/team/${team.name.toLowerCase()}`)}
-                        sx={{ textTransform: 'none' }}
-                      >
-                        View Details
-                      </Button>
-                    </Box>
-                  </CardContent>
-                </Card>
+            {sortedTeams.map((team) => (
+              <Grid item xs={12} md={6} lg={4} key={team._id}>
+                <TeamCard team={team} />
               </Grid>
             ))}
           </Grid>
