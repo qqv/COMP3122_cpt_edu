@@ -28,13 +28,23 @@ export const teamService = {
 
   getTeamDetails: async (id: string) => {
     try {
-      const [team, stats] = await Promise.all([
-        api.get(`/teams/${id}`).then(res => res.data),
-        api.get(`/teams/${id}/stats`).then(res => res.data)
-      ])
-      return { ...team, ...stats }
+      if (!id) throw new Error('Team ID is required');
+      
+      const [teamResponse, statsResponse] = await Promise.all([
+        api.get(`/teams/${id}`).catch(error => {
+          console.error('Error fetching team:', error);
+          throw new Error(error.response?.data?.message || 'Failed to fetch team');
+        }),
+        api.get(`/teams/${id}/stats`).catch(error => {
+          console.error('Error fetching team stats:', error);
+          return { data: {} }; // 返回空对象而不是抛出错误
+        })
+      ]);
+      
+      return { ...teamResponse.data, ...statsResponse.data };
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch team details')
+      console.error('Error in getTeamDetails:', error);
+      throw new Error(error.message || 'Failed to fetch team details');
     }
   },
 
@@ -44,6 +54,15 @@ export const teamService = {
       return data
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to fetch team analytics')
+    }
+  },
+
+  getTeamByName: async (name: string) => {
+    try {
+      const { data } = await api.get(`/teams/name/${encodeURIComponent(name)}`)
+      return data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch team')
     }
   }
 } 

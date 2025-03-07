@@ -30,7 +30,6 @@ function App() {
       <div style={{ minHeight: '100vh' }}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/teams" element={<Teams />} />
           <Route path="/team/:id" element={<TeamDetail />} />
           <Route path="/login" element={<Login />} />

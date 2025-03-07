@@ -96,12 +96,12 @@ export const TeamCard = ({ team }: TeamCardProps) => {
         </Box>
 
         <Box sx={{ mb: 3 }}>
-          <AvatarGroup max={5} sx={{ justifyContent: 'flex-start' }}>
-            {team.members.map((member) => (
+          <AvatarGroup max={4} sx={{ mb: 2 }}>
+            {team.members.map((member, index) => (
               <Avatar 
-                key={member.userId.name} 
+                key={member.userId._id || index}
+                alt={member.userId.name} 
                 src={getGithubAvatarUrl(member.userId.githubId)}
-                alt={member.userId.name}
               />
             ))}
           </AvatarGroup>
@@ -163,7 +163,7 @@ export const TeamCard = ({ team }: TeamCardProps) => {
         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             endIcon={<ArrowForwardIcon />}
-            onClick={() => navigate(`/team/${team.name.toLowerCase()}`)}
+            onClick={() => navigate(`/team/${team._id}`)}
             sx={{ textTransform: 'none' }}
           >
             View Details

@@ -51,10 +51,16 @@ export default function TeamDetail() {
     const fetchTeamDetails = async () => {
       try {
         setLoading(true)
+        console.log("Fetching team with ID:", id)
+        
+        // 直接使用 ID 获取团队详情
         const data = await teamService.getTeamDetails(id!)
+        console.log("Team data received:", JSON.stringify(data, null, 2))
+        
         setTeam(data)
         setError(null)
       } catch (err: any) {
+        console.error("Error fetching team:", err)
         setError(err.message)
       } finally {
         setLoading(false)
@@ -87,7 +93,7 @@ export default function TeamDetail() {
   }, [team])
 
   const getMailtoLink = () => {
-    if (!team) return '#'
+    if (!team || !team.memberStats) return '#'
     
     const emails = team.memberStats
       .map(member => member.userId.email)
@@ -125,27 +131,36 @@ export default function TeamDetail() {
 
   if (loading) {
     return (
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          height: '100vh' 
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
       </Box>
-    )
+    );
   }
 
-  if (error || !team) {
+  if (error) {
     return (
-      <ErrorPage 
-        code={404}
-        title="Team Not Found"
-        message={error || 'The requested team could not be found.'}
-      />
-    )
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h5" color="error" gutterBottom>
+          {error}
+        </Typography>
+        <Button variant="contained" onClick={() => window.history.back()}>
+          Go Back
+        </Button>
+      </Box>
+    );
+  }
+
+  if (!team) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h5" gutterBottom>
+          Team not found
+        </Typography>
+        <Button variant="contained" onClick={() => window.history.back()}>
+          Go Back
+        </Button>
+      </Box>
+    );
   }
 
   return (
@@ -317,20 +332,38 @@ export default function TeamDetail() {
                   Activity Timeline
                 </Typography>
                 <Box sx={{ height: 300 }}>
-                  <LineChart
-                    series={[
-                      {
-                        data: activityData.map(item => item.commits),
-                        label: 'Commits',
-                        color: 'primary.main'
-                      }
-                    ]}
-                    xAxis={[{
-                      data: activityData.map(item => item.date),
-                      scaleType: 'band',
-                    }]}
-                    height={250}
-                  />
+                  {activityData.length > 0 ? (
+                    <LineChart
+                      series={[
+                        {
+                          data: activityData.map(item => item.commits),
+                          label: 'Commits',
+                          color: '#2196f3'
+                        }
+                      ]}
+                      xAxis={[
+                        {
+                          data: activityData.map(item => item.date),
+                          scaleType: 'point',
+                          valueFormatter: (value) => value.toString()
+                        }
+                      ]}
+                      height={250}
+                      margin={{ top: 20, right: 20, bottom: 30, left: 40 }}
+                      slotProps={{
+                        legend: {
+                          hidden: false,
+                          position: { vertical: 'top', horizontal: 'right' }
+                        }
+                      }}
+                    />
+                  ) : (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        No activity data available
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </Paper>
             </Grid>
@@ -340,14 +373,22 @@ export default function TeamDetail() {
                   Member Contribution
                 </Typography>
                 <Box sx={{ height: 300 }}>
-                  <PieChart
-                    series={[{
-                      data: contributionData,
-                      highlightScope: { faded: 'global', highlighted: 'item' },
-                      faded: { innerRadius: 30, additionalRadius: -30 }
-                    }]}
-                    height={250}
-                  />
+                  {contributionData.length > 0 ? (
+                    <PieChart
+                      series={[{
+                        data: contributionData,
+                        highlightScope: { faded: 'global', highlighted: 'item' },
+                        faded: { innerRadius: 30, additionalRadius: -30 }
+                      }]}
+                      height={250}
+                    />
+                  ) : (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        No contribution data available
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </Paper>
             </Grid>
@@ -377,7 +418,7 @@ export default function TeamDetail() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {team.memberStats.map((member) => (
+                {team?.memberStats && team.memberStats.map((member) => (
                   <TableRow key={member.userId._id}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -426,37 +467,21 @@ export default function TeamDetail() {
                   </Box>
                 </Box>
                 <Stack spacing={3} sx={{ maxHeight: 'calc(100% - 60px)', overflow: 'auto' }}>
-                  {team.memberStats.map((member) => 
-                    member.contribution.lastCommit && (
-                      <Box key={member.userId._id}>
-                        <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                          <Avatar 
-                            sx={{ mr: 2 }} 
-                            src={getGithubAvatarUrl(member.userId.githubId)}
-                          />
-                          <Box>
-                            <Typography variant="body2">
-                              <Link href="#" underline="hover" color="inherit">
-                                {member.userId.name}
-                              </Link>
-                              {' made '}{member.contribution.commits} commits
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                              {formatLastActive(member.contribution.lastCommit)}
-                            </Typography>
-                            <Box sx={{ mt: 1, bgcolor: 'grey.50', borderRadius: 1, p: 1 }}>
-                              <Typography variant="caption" display="block" sx={{ fontFamily: 'monospace' }}>
-                                + Added {member.contribution.additions} lines
-                              </Typography>
-                              <Typography variant="caption" display="block" sx={{ fontFamily: 'monospace' }}>
-                                - Removed {member.contribution.deletions} lines
-                              </Typography>
-                            </Box>
-                          </Box>
+                  {team?.analytics?.commitActivity && team.analytics.commitActivity.map((item, index) => (
+                    <Box key={item.date || index}>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                        <Avatar sx={{ mr: 2 }} />
+                        <Box>
+                          <Typography variant="body2">
+                            {item.count} commits on {new Date(item.date).toLocaleDateString()}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                            {formatLastActive(item.date)}
+                          </Typography>
                         </Box>
                       </Box>
-                    )
-                  )}
+                    </Box>
+                  ))}
                 </Stack>
               </Paper>
             </Grid>
@@ -465,7 +490,7 @@ export default function TeamDetail() {
               <Paper sx={{ p: 3 }}>
                 <Typography variant="h6" gutterBottom>Team Progress</Typography>
                 <Stack spacing={3}>
-                  {team.memberStats.map((member) => (
+                  {team?.memberStats && team.memberStats.map((member) => (
                     <Box key={member.userId._id}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                         <Avatar 

@@ -23,7 +23,7 @@ import {
 } from '@mui/icons-material'
 
 const menuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Teams', icon: <GroupIcon />, path: '/teams' },
   { text: 'Students', icon: <SchoolIcon />, path: '/students' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
