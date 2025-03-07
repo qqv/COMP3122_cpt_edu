@@ -75,8 +75,8 @@ collaborative-project-tracker/
 
 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/collaborative-project-tracker.git
-cd collaborative-project-tracker
+git clone https://github.com/qqv/cpt_edu.git
+cd cpt_edu
 ```
 
 2. Install frontend dependencies
@@ -87,34 +87,38 @@ npm install
 
 3. Install backend dependencies
 ```bash
-cd ../server
+cd server
 npm install
 
 # Initialize MongoDB
 npm run init-db
 ```
 
-4. Create environment variables
+4. Create environment variables (.env)
 ```bash
 # In server/.env
 MONGODB_URI=your_mongodb_uri
 GITHUB_TOKEN=your_github_token
 PORT=5000
+NODE_ENV=development
 
 # In client/.env
 REACT_APP_API_URL=http://localhost:5000
+VITE_API_URL=http://localhost:5000/api 
 ```
 
 5. Start the development servers
 ```bash
 # Start backend (from server directory)
+cd ./client
 npm run dev
 
 # Start frontend (from client directory)
-npm start
+cd ./server
+npm run dev
 ```
 
-## Contributing
+## Contributing (Draft)
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
