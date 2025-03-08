@@ -100,6 +100,15 @@ export const teamService = {
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to change team leader');
     }
+  },
+
+  removeTeamMember: async (teamId: string, memberId: string) => {
+    try {
+      const { data } = await api.delete(`/teams/${teamId}/members/${memberId}`);
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to remove team member');
+    }
   }
 }
 

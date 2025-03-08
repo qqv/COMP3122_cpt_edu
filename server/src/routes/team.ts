@@ -424,4 +424,41 @@ router.get('/:teamId/available-students', async (req: Request, res: Response, ne
   }
 });
 
+// 添加移除团队成员的路由
+router.delete('/:id/members/:memberId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id, memberId } = req.params;
+    
+    // 查找团队
+    const team = await Team.findById(id);
+    
+    if (!team) {
+      return next(new AppError('Team not found', 404));
+    }
+    
+    // 检查成员是否存在
+    const memberIndex = team.members.findIndex(
+      member => member.userId.toString() === memberId
+    );
+    
+    if (memberIndex === -1) {
+      return next(new AppError('Member not found in team', 404));
+    }
+    
+    // 检查是否是团队领导
+    if (team.members[memberIndex].role === 'leader') {
+      return next(new AppError('Cannot remove team leader. Change leader first.', 400));
+    }
+    
+    // 移除成员
+    team.members.splice(memberIndex, 1);
+    
+    await team.save();
+    
+    res.status(200).json({ message: 'Member removed successfully' });
+  } catch (error) {
+    next(new AppError('Failed to remove team member', 500));
+  }
+});
+
 export default router 

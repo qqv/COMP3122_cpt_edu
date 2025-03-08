@@ -507,6 +507,31 @@ export default function TeamDetail() {
     }
   };
 
+  // 添加移除成员的函数
+  const handleRemoveMember = async (memberId: string) => {
+    try {
+      if (!id) {
+        throw new Error('Team ID is required');
+      }
+      
+      await teamService.removeTeamMember(id, memberId);
+      
+      // 刷新团队数据
+      const updatedTeam = await teamService.getTeamDetails(id);
+      setTeam(updatedTeam);
+      
+      setActionSuccess('Member removed successfully');
+      
+      // 3秒后清除成功消息
+      setTimeout(() => {
+        setActionSuccess('');
+      }, 3000);
+    } catch (error: any) {
+      console.error('Error removing team member:', error);
+      setActionError(error.message || 'Failed to remove team member');
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -865,6 +890,7 @@ export default function TeamDetail() {
                   <TableCell>PRs</TableCell>
                   <TableCell>Last Active</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -896,6 +922,18 @@ export default function TeamDetail() {
                         size="small"
                         color={member.contribution.lastCommit ? 'success' : 'warning'}
                       />
+                    </TableCell>
+                    <TableCell align="right">
+                      {member.role !== 'leader' && (
+                        <IconButton 
+                          size="small" 
+                          color="error"
+                          onClick={() => handleRemoveMember(member.userId._id)}
+                          title="Remove member"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
