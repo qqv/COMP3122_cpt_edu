@@ -65,5 +65,21 @@ export interface TeamDetails extends Team {
       author: string
       percentage: number
     }>
+    totalCommits?: number
+    totalPRs?: number
+    issues?: number
+    reviews?: number
   }
+  recentActivity?: Array<{
+    id: string
+    message: string
+    author: {
+      name: string
+      email: string
+      date: string
+      avatar: string | null
+      githubId: string | null
+    }
+    url: string
+  }>
 } 

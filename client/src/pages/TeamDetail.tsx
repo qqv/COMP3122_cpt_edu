@@ -61,13 +61,19 @@ import { getGithubAvatarUrl } from '../utils/github'
 import { TeamDetails } from '../types/team'
 import { formatLastActive } from '../utils/dateFormat'
 
+// 添加类型定义
+interface AvailableStudent {
+  _id: string;
+  name: string;
+  email: string;
+  githubId: string;
+}
 
 export default function TeamDetail() {
   const { id } = useParams()
   const [team, setTeam] = useState<TeamDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  // TODO: 需要从后端获取课程信息
   const [courseName, setCourseName] = useState<string>('')
   const [timeRange, setTimeRange] = useState<'7days' | '14days' | 'all'>('7days')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -75,7 +81,7 @@ export default function TeamDetail() {
   const [deleteError, setDeleteError] = useState('')
   const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   const [changeLeaderDialogOpen, setChangeLeaderDialogOpen] = useState(false);
-  const [availableStudents, setAvailableStudents] = useState([]);
+  const [availableStudents, setAvailableStudents] = useState<AvailableStudent[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [newLeaderId, setNewLeaderId] = useState('');
   const [actionError, setActionError] = useState('');
@@ -85,6 +91,9 @@ export default function TeamDetail() {
     const fetchTeamDetails = async () => {
       setLoading(true);
       try {
+        if (!id) {
+          throw new Error('Team ID is required');
+        }
         const data = await teamService.getTeamDetails(id);
         console.log('Team details data:', data);
         setTeam(data);
@@ -283,15 +292,15 @@ export default function TeamDetail() {
       },
       issues: { 
         total: team.analytics.issues || 0, 
-        change: calculatePercentChange(team.analytics.issues, Math.max(1, team.analytics.issues * 0.9))
+        // change: calculatePercentChange(team.analytics.issues, Math.max(1, team.analytics.issues * 0.9))
       },
       prs: { 
         total: team.analytics.totalPRs || 0, 
-        change: calculatePercentChange(team.analytics.totalPRs, Math.max(1, team.analytics.totalPRs * 0.85))
+        // change: calculatePercentChange(team.analytics.totalPRs, Math.max(1, team.analytics.totalPRs * 0.85))
       },
       reviews: { 
         total: team.analytics.reviews || 0, 
-        change: calculatePercentChange(team.analytics.reviews, Math.max(1, team.analytics.reviews * 0.8))
+        // change: calculatePercentChange(team.analytics.reviews, Math.max(1, team.analytics.reviews * 0.8))
       }
     };
   }, [team]);
@@ -342,30 +351,63 @@ export default function TeamDetail() {
         date: new Date(activity.author.date),
         message: activity.message,
         url: activity.url,
-        avatar: teamMember ? teamMember.avatar : activity.author.avatar || getGithubAvatarUrl(activity.author.githubId)
+        avatar: teamMember ? teamMember.avatar : (activity.author.avatar || getGithubAvatarUrl(activity.author.githubId || ''))
       };
     });
   }, [team]);
 
-  // 修改 teamProgress 数据计算
+  // 完全替换 teamProgress 函数
   const teamProgress = useMemo(() => {
+    if (!team || !team.analytics) return {
+      issues: { total: 0, change: 0 },
+      prs: { total: 0, change: 0 },
+      reviews: { total: 0, change: 0 }
+    };
+
+    // 安全地获取值
+    const issuesValue = team.analytics?.issues ?? 0;
+    const prsValue = team.analytics?.totalPRs ?? 0;
+    const reviewsValue = team.analytics?.reviews ?? 0;
+
+    // 安全的计算百分比变化函数
+    const safeCalculateChange = (current: number, previous: number): number => {
+      if (previous === 0) return 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
+    return {
+      issues: { 
+        total: issuesValue, 
+        change: safeCalculateChange(issuesValue, Math.max(1, issuesValue * 0.9))
+      },
+      prs: { 
+        total: prsValue, 
+        change: safeCalculateChange(prsValue, Math.max(1, prsValue * 0.85))
+      },
+      reviews: { 
+        total: reviewsValue, 
+        change: safeCalculateChange(reviewsValue, Math.max(1, reviewsValue * 0.8))
+      }
+    };
+  }, [team]);
+
+  // 添加团队成员贡献数据计算
+  const memberContributions = useMemo(() => {
     if (!team?.memberStats) return {
       commits: [],
-      prs: [],
-      issues: []
+      prs: []
     };
     
     // 计算每个成员的贡献百分比
     const totalCommits = team.memberStats.reduce((sum, member) => sum + member.contribution.commits, 0);
     const totalPRs = team.memberStats.reduce((sum, member) => sum + (member.contribution.prs || 0), 0);
-    const totalIssues = team.analytics?.issues || 0;
     
     // 为每个成员分配一个颜色
     const memberColors = {};
     team.memberStats.forEach((member, index) => {
       memberColors[member.userId._id] = `hsl(${(index * 360) / team.memberStats.length}, 70%, 50%)`;
     });
-    
+
     // 计算每个成员的贡献百分比
     const commitContributions = team.memberStats
       .filter(member => member.contribution.commits > 0)
@@ -389,22 +431,21 @@ export default function TeamDetail() {
       }))
       .sort((a, b) => b.percentage - a.percentage);
     
-    // 由于我们没有每个成员的 issues 数据，这里只是示例
-    const issueContributions = [];
-    
     return {
       commits: commitContributions,
-      prs: prContributions,
-      issues: issueContributions
+      prs: prContributions
     };
   }, [team]);
 
   const fetchAvailableStudents = async () => {
     try {
-      // 获取所有学生
-      const students = await teamService.getAvailableStudents();
+      if (!id) {
+        throw new Error('Team ID is required');
+      }
+      const students = await teamService.getAvailableStudents(id);
       setAvailableStudents(students);
-    } catch (error) {
+      setActionError('');
+    } catch (error: any) {
       console.error('Error fetching available students:', error);
       setActionError('Failed to load available students');
     }
@@ -586,7 +627,7 @@ export default function TeamDetail() {
                   {statsData.issues.total || 0}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Chip 
+                  {/* <Chip 
                     label={`${statsData.issues.change > 0 ? '+' : ''}${statsData.issues.change}%`}
                     color={statsData.issues.change >= 0 ? 'success' : 'error'}
                     size="small"
@@ -594,7 +635,7 @@ export default function TeamDetail() {
                   />
                   <Typography variant="body2" color="text.secondary">
                     vs last week
-                  </Typography>
+                  </Typography> */}
                 </Box>
               </Paper>
             </Grid>
@@ -611,7 +652,7 @@ export default function TeamDetail() {
                   {statsData.prs.total || 0}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Chip 
+                  {/* <Chip 
                     label={`${statsData.prs.change > 0 ? '+' : ''}${statsData.prs.change}%`}
                     color={statsData.prs.change >= 0 ? 'success' : 'error'}
                     size="small"
@@ -619,7 +660,7 @@ export default function TeamDetail() {
                   />
                   <Typography variant="body2" color="text.secondary">
                     vs last week
-                  </Typography>
+                  </Typography> */}
                 </Box>
               </Paper>
             </Grid>
@@ -636,7 +677,7 @@ export default function TeamDetail() {
                   {statsData.reviews.total || 0}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Chip 
+                  {/* <Chip 
                     label={`${statsData.reviews.change > 0 ? '+' : ''}${statsData.reviews.change}%`}
                     color={statsData.reviews.change >= 0 ? 'success' : 'error'}
                     size="small"
@@ -644,7 +685,7 @@ export default function TeamDetail() {
                   />
                   <Typography variant="body2" color="text.secondary">
                     vs last week
-                  </Typography>
+                  </Typography> */}
                 </Box>
               </Paper>
             </Grid>
@@ -724,17 +765,14 @@ export default function TeamDetail() {
                   Member Contribution
                 </Typography>
                 <Box sx={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {contributionData.length > 0 ? (
+                  {memberContributions.commits.length > 0 ? (
                     <PieChart
                       series={[
                         {
-                          data: contributionData,
+                          data: memberContributions.commits,
                           highlightScope: { faded: 'global', highlighted: 'item' },
                           faded: { innerRadius: 30, additionalRadius: -30, color: 'gray' },
-                          // innerRadius: 30,
-                          // outerRadius: 80,
-                          // paddingAngle: 2,
-                          // cornerRadius: 4
+                          arcLabel: (item) => `${item.name}`
                         }
                       ]}
                       height={260}
@@ -755,6 +793,31 @@ export default function TeamDetail() {
                   ) : (
                     <Typography color="text.secondary">No contribution data available</Typography>
                   )}
+                </Box>
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Contribution Legend
+                  </Typography>
+                  <Grid container spacing={1}>
+                    {memberContributions.commits.map(member => (
+                      <Grid item xs={6} key={member.id}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box 
+                            sx={{ 
+                              width: 12, 
+                              height: 12, 
+                              borderRadius: '50%', 
+                              bgcolor: member.color,
+                              mr: 1 
+                            }} 
+                          />
+                          <Typography variant="caption" noWrap>
+                            {member.name}: {member.percentage}%
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    ))}
+                  </Grid>
                 </Box>
               </Paper>
             </Grid>
@@ -900,23 +963,24 @@ export default function TeamDetail() {
                     <Typography variant="body2">{team?.analytics?.totalCommits || 0} total</Typography>
                   </Box>
                   
-                  {teamProgress.commits.length > 0 ? (
+                  {memberContributions.commits.length > 0 ? (
                     <>
                       <Box sx={{ height: 20, display: 'flex', width: '100%', borderRadius: 1, overflow: 'hidden' }}>
-                        {teamProgress.commits.map(member => (
+                        {memberContributions.commits.map(member => (
                           <Box 
                             key={member.id}
                             sx={{ 
+                              height: '100%', 
                               width: `${member.percentage}%`, 
                               bgcolor: member.color,
-                              height: '100%'
-                            }}
+                              minWidth: 5
+                            }} 
                           />
                         ))}
                       </Box>
                       
                       <Box sx={{ mt: 1 }}>
-                        {teamProgress.commits.map(member => (
+                        {memberContributions.commits.map(member => (
                           <Box key={member.id} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                             <Box 
                               sx={{ 
@@ -925,17 +989,22 @@ export default function TeamDetail() {
                                 borderRadius: '50%', 
                                 bgcolor: member.color,
                                 mr: 1 
-                              }}
+                              }} 
                             />
-                            <Typography variant="caption">
-                              {member.name}: {member.value} commits ({member.percentage}%)
+                            <Typography variant="caption" sx={{ mr: 1 }}>
+                              {member.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {member.percentage}% ({member.value})
                             </Typography>
                           </Box>
                         ))}
                       </Box>
                     </>
                   ) : (
-                    <Typography variant="body2" color="text.secondary">No commit data available</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      No commit data available
+                    </Typography>
                   )}
                 </Box>
                 
@@ -945,23 +1014,24 @@ export default function TeamDetail() {
                     <Typography variant="body2">{team?.analytics?.totalPRs || 0} total</Typography>
                   </Box>
                   
-                  {teamProgress.prs.length > 0 ? (
+                  {memberContributions.prs.length > 0 ? (
                     <>
                       <Box sx={{ height: 20, display: 'flex', width: '100%', borderRadius: 1, overflow: 'hidden' }}>
-                        {teamProgress.prs.map(member => (
+                        {memberContributions.prs.map(member => (
                           <Box 
                             key={member.id}
                             sx={{ 
+                              height: '100%', 
                               width: `${member.percentage}%`, 
                               bgcolor: member.color,
-                              height: '100%'
-                            }}
+                              minWidth: 5
+                            }} 
                           />
                         ))}
                       </Box>
                       
                       <Box sx={{ mt: 1 }}>
-                        {teamProgress.prs.map(member => (
+                        {memberContributions.prs.map(member => (
                           <Box key={member.id} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                             <Box 
                               sx={{ 
@@ -970,17 +1040,22 @@ export default function TeamDetail() {
                                 borderRadius: '50%', 
                                 bgcolor: member.color,
                                 mr: 1 
-                              }}
+                              }} 
                             />
-                            <Typography variant="caption">
-                              {member.name}: {member.value} PRs ({member.percentage}%)
+                            <Typography variant="caption" sx={{ mr: 1 }}>
+                              {member.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {member.percentage}% ({member.value})
                             </Typography>
                           </Box>
                         ))}
                       </Box>
                     </>
                   ) : (
-                    <Typography variant="body2" color="text.secondary">No PR data available</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      No PR data available
+                    </Typography>
                   )}
                 </Box>
               </Paper>

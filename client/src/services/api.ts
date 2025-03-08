@@ -75,9 +75,9 @@ export const teamService = {
     }
   },
 
-  getAvailableStudents: async () => {
+  getAvailableStudents: async (teamId: string) => {
     try {
-      const { data } = await api.get('/teams/students/available');
+      const { data } = await api.get(`/teams/${teamId}/available-students`);
       return data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to fetch available students');

@@ -391,4 +391,37 @@ router.put('/:id/leader', async (req: Request, res: Response, next: NextFunction
   }
 });
 
+// 添加获取可用学生的路由
+router.get('/:teamId/available-students', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { teamId } = req.params;
+    
+    // 获取所有团队的成员ID
+    const teams = await Team.find().lean();
+    
+    // 获取当前团队（如果存在）
+    const currentTeam = teams.find(team => team._id.toString() === teamId);
+    if (!currentTeam) {
+      return next(new AppError('Team not found', 404));
+    }
+    
+    // 收集所有已经在团队中的学生ID
+    const allTeamMemberIds = teams.flatMap(team => 
+      team.members.map(member => member.userId.toString())
+    );
+    
+    // 获取所有学生
+    const allStudents = await Student.find().lean();
+    
+    // 过滤出可用的学生（不在任何团队中的学生）
+    const availableStudents = allStudents.filter(student => 
+      !allTeamMemberIds.includes(student._id.toString())
+    );
+    
+    res.status(200).json(availableStudents);
+  } catch (error) {
+    next(new AppError('Failed to fetch available students', 500));
+  }
+});
+
 export default router 
