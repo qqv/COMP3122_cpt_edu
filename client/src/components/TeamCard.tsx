@@ -2,7 +2,7 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Card, CardContent, Box, Typography, Chip, Button, Stack, IconButton,
-  Avatar, AvatarGroup, Divider, LinearProgress
+  Avatar, AvatarGroup, Divider, LinearProgress, Alert, Tooltip
 } from '@mui/material'
 import {
   Email as EmailIcon,
@@ -10,7 +10,8 @@ import {
   BugReport as BugReportIcon,
   MergeType as MergeTypeIcon,
   ArrowForward as ArrowForwardIcon,
-  MoreVert as MoreVertIcon
+  MoreVert as MoreVertIcon,
+  ContentCopy as ContentCopyIcon
 } from '@mui/icons-material'
 import { formatLastActive } from '../utils/dateFormat'
 import { getActivityStatus } from '../utils/activity'
@@ -19,9 +20,11 @@ import { getGithubAvatarUrl } from '../utils/github'
 
 interface TeamCardProps {
   team: Team
+  onCopyInvite: (inviteCode: string) => void
+  onEmailLeader: () => void
 }
 
-export const TeamCard = ({ team }: TeamCardProps) => {
+export const TeamCard = ({ team, onCopyInvite, onEmailLeader }: TeamCardProps) => {
   const navigate = useNavigate()
   
   if (!team) {
@@ -71,13 +74,26 @@ export const TeamCard = ({ team }: TeamCardProps) => {
           <Typography variant="body2" color="white" align="center" mb={2}>
             The repository for this team could not be accessed.
           </Typography>
-          <IconButton
-            href={getMailtoLink()}
-            color="primary"
-            sx={{ bgcolor: 'background.paper' }}
-          >
-            <EmailIcon />
-          </IconButton>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Email team leader">
+              <IconButton
+                color="primary"
+                sx={{ bgcolor: 'background.paper' }}
+                onClick={onEmailLeader}
+              >
+                <EmailIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Copy invite link">
+              <IconButton
+                color="primary"
+                sx={{ bgcolor: 'background.paper' }}
+                onClick={() => onCopyInvite(team.inviteCode)}
+              >
+                <ContentCopyIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
       )}
       <CardContent sx={{ opacity: team.exists ? 1 : 0.4 }}>
@@ -90,9 +106,9 @@ export const TeamCard = ({ team }: TeamCardProps) => {
               {team.description}
             </Typography> */}
           </Box>
-          <IconButton>
+          {/* <IconButton>
             <MoreVertIcon />
-          </IconButton>
+          </IconButton> */}
         </Box>
 
         <Box sx={{ mb: 3 }}>

@@ -1,16 +1,35 @@
-import mongoose from 'mongoose'
+import mongoose, { Schema, Document } from 'mongoose'
 
-const courseSchema = new mongoose.Schema({
+export interface ICourse extends Document {
+  name: string;
+  code: string;
+  description?: string;
+  teachers: mongoose.Types.ObjectId[];
+  startDate: Date;
+  endDate: Date;
+  status: string;
+}
+
+const courseSchema = new Schema({
   name: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
-  description: String,
-  teacher: {
+  code: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  teachers: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
+    ref: 'User'
+  }],
   startDate: {
     type: Date,
     required: true
@@ -21,11 +40,11 @@ const courseSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'archived'],
+    enum: ['active', 'inactive', 'archived'],
     default: 'active'
   }
 }, {
   timestamps: true
 })
 
-export default mongoose.model('Course', courseSchema) 
+export default mongoose.model<ICourse>('Course', courseSchema) 

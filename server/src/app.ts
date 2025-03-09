@@ -6,6 +6,7 @@ import dotenv from 'dotenv'
 import { config } from './config'
 import { errorHandler } from './middleware/error'
 import './utils/warnings'
+import cookieParser from 'cookie-parser'
 
 import userRoutes from './routes/user'
 import teamRoutes from './routes/team'
@@ -61,6 +62,7 @@ app.use(cors({
 }))
 app.use(helmet())
 app.use(express.json())
+app.use(cookieParser())
 
 // Database connection
 mongoose.connect(config.mongodb.uri, {
@@ -79,6 +81,10 @@ app.use('/api/students', studentRoutes)
 // Error handling
 app.use(errorHandler)
 
-app.listen(config.server.port, () => {
-  console.log(`Server is running on port ${config.server.port}`)
-}) 
+// Start server
+const PORT = config.server.port || 5000
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`)
+})
+
+export default app 

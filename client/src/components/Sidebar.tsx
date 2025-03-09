@@ -28,7 +28,8 @@ const menuItems = [
   { text: 'Students', icon: <SchoolIcon />, path: '/students' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
   { text: 'Reports', icon: <ReportIcon />, path: '/reports' },
-  { text: 'Settings', icon: <SettingsIcon />, path: '/settings' }
+  { text: 'Users', icon: <GroupIcon />, path: '/users' },
+  { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ]
 
 export default function Sidebar() {

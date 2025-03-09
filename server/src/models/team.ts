@@ -1,45 +1,56 @@
-import { Schema, model, Types } from 'mongoose'
+import mongoose, { Schema, Document } from 'mongoose'
 
-interface ITeam {
+export interface ITeam extends Document {
   name: string
   // description: string
   repositoryUrl: string
   members: Array<{
-    userId: Types.ObjectId
+    userId: mongoose.Types.ObjectId
     role: 'leader' | 'member'
   }>
-  course: Types.ObjectId
+  course: mongoose.Types.ObjectId
+  inviteCode: string
+  createdAt: Date
+  updatedAt: Date
 }
 
-const teamSchema = new Schema<ITeam>({
-  name: {
-    type: String,
-    required: true
-  },
-  // description: String,
-  repositoryUrl: {
-    type: String,
-    required: true
-  },
-  members: [{
-    userId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Student',
+const teamSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    // description: String,
+    repositoryUrl: {
+      type: String,
+      default: ''
+    },
+    members: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Student',
+          required: true
+        },
+        role: {
+          type: String,
+          enum: ['leader', 'member'],
+          default: 'member'
+        }
+      }
+    ],
+    course: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Course',
       required: true
     },
-    role: {
+    inviteCode: {
       type: String,
-      enum: ['leader', 'member'],
-      default: 'member'
+      unique: true
     }
-  }],
-  course: {
-    type: Schema.Types.ObjectId,
-    ref: 'Course',
-    required: true
-  }
-}, {
-  timestamps: true
-})
+  },
+  { timestamps: true }
+)
 
-export default model<ITeam>('Team', teamSchema) 
+export default mongoose.model<ITeam>('Team', teamSchema) 

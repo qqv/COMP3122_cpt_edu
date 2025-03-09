@@ -109,25 +109,178 @@ export const teamService = {
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to remove team member');
     }
-  }
+  },
+
+  createTeam: async (teamData: { name: string; leaderEmail: string; courseId: string }) => {
+    try {
+      const { data } = await api.post('/teams', teamData);
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to create team');
+    }
+  },
+
+  batchCreateTeams: async (teams: Array<{ name: string; leaderEmail: string }>, courseId: string) => {
+    try {
+      const { data } = await api.post('/teams/batch', { teams, courseId });
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to create teams');
+    }
+  },
+
+  getTeamByInviteCode: async (inviteCode: string) => {
+    try {
+      const { data } = await api.get(`/teams/invite/${inviteCode}`);
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch team by invite code');
+    }
+  },
+
+  updateTeamRepository: async (teamId: string, repositoryUrl: string) => {
+    try {
+      const { data } = await api.put(`/teams/${teamId}/repository`, { repositoryUrl });
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to update repository URL');
+    }
+  },
+
+  verifyInvite: async (inviteCode: string) => {
+    const response = await api.get(`/teams/invite/${inviteCode}`);
+    return response.data;
+  },
 }
 
 export const courseService = {
   getAllCourses: async () => {
     try {
-      const response = await api.get('/courses');
-      return response.data;
-    } catch (error: any) {
+      const { data } = await api.get('/courses');
+      return data;
+    } catch (error) {
       throw new Error(error.response?.data?.message || 'Failed to fetch courses');
     }
   },
   
-  getCourseById: async (courseId: string) => {
+  getCourseById: async (id) => {
     try {
-      const response = await api.get(`/courses/${courseId}`);
-      return response.data;
-    } catch (error: any) {
+      const { data } = await api.get(`/courses/${id}`);
+      return data;
+    } catch (error) {
       throw new Error(error.response?.data?.message || 'Failed to fetch course');
     }
+  },
+  
+  createCourse: async (courseData) => {
+    try {
+      const { data } = await api.post('/courses', courseData);
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to create course');
+    }
+  },
+  
+  updateCourse: async (id, courseData) => {
+    try {
+      const { data } = await api.put(`/courses/${id}`, courseData);
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to update course');
+    }
+  },
+  
+  deleteCourse: async (id) => {
+    try {
+      const { data } = await api.delete(`/courses/${id}`);
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to delete course');
+    }
+  },
+  
+  assignTeachers: async (id, teachers) => {
+    try {
+      const { data } = await api.post(`/courses/${id}/assign-teachers`, { teachers });
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to assign teachers');
+    }
   }
-} 
+};
+
+export const studentService = {
+  searchStudents: async (query: string) => {
+    try {
+      const { data } = await api.post('/students/search', { query });
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to search students');
+    }
+  },
+  
+  getStudentById: async (id: string) => {
+    try {
+      const { data } = await api.get(`/students/${id}`);
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch student');
+    }
+  }
+};
+
+export const userService = {
+  getAllUsers: async () => {
+    try {
+      const { data } = await api.get('/users');
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch users');
+    }
+  },
+  
+  getUserById: async (id) => {
+    try {
+      const { data } = await api.get(`/users/${id}`);
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch user');
+    }
+  },
+  
+  createUser: async (userData) => {
+    try {
+      const { data } = await api.post('/users', userData);
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to create user');
+    }
+  },
+  
+  updateUser: async (id, userData) => {
+    try {
+      const { data } = await api.put(`/users/${id}`, userData);
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to update user');
+    }
+  },
+  
+  resetPassword: async (id, newPassword) => {
+    try {
+      const { data } = await api.post(`/users/${id}/reset-password`, { newPassword });
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to reset password');
+    }
+  },
+  
+  assignCourses: async (id, courses) => {
+    try {
+      const { data } = await api.post(`/users/${id}/assign-courses`, { courses });
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to assign courses');
+    }
+  }
+}; 

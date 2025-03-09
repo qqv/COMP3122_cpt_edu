@@ -5,6 +5,7 @@ import type { Request, Response, NextFunction } from 'express'
 import { GitHubService } from '../services/github.service'
 import { UserService } from '../services/user.service'
 import Student from '../models/student'
+import crypto from 'crypto'
 
 const router = Router()
 
@@ -226,15 +227,125 @@ router.get('/:id/stats', async (req: Request, res: Response, next: NextFunction)
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const team = new Team(req.body)
-    await team.save()
-    res.status(201).json(team)
+    const { name, leaderEmail, courseId } = req.body;
+    
+    if (!name || !leaderEmail || !courseId) {
+      return next(new AppError('Name, leader email and course ID are required', 400));
+    }
+    
+    // 查找或创建学生
+    let student = await Student.findOne({ email: leaderEmail });
+    
+    if (!student) {
+      // 如果学生不存在，创建一个新学生
+      student = new Student({
+        name: leaderEmail.split('@')[0], // 使用邮箱前缀作为临时名称
+        email: leaderEmail,
+        // 其他字段可以在学生首次登录时更新
+      });
+      
+      await student.save();
+    }
+    
+    // 生成唯一的邀请码
+    const inviteCode = crypto.randomBytes(16).toString('hex');
+    
+    // 创建团队
+    const team = new Team({
+      name,
+      course: courseId,
+      members: [{
+        userId: student._id,
+        role: 'leader'
+      }],
+      inviteCode,
+      repositoryUrl: '' // 初始为空，由团队领导提交
+    });
+    
+    await team.save();
+    
+    // 生成邀请链接
+    const inviteLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/invite/${inviteCode}`;
+    
+    res.status(201).json({
+      message: 'Team created successfully',
+      teamId: team._id,
+      inviteCode,
+      inviteLink
+    });
   } catch (error) {
-    res.status(400).json({ message: 'Error creating team' })
+    console.error('Error creating team:', error);
+    next(new AppError('Failed to create team', 500));
   }
-})
+});
+
+router.post('/batch', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { teams, courseId } = req.body;
+    
+    if (!teams || !Array.isArray(teams) || teams.length === 0 || !courseId) {
+      return next(new AppError('Teams array and course ID are required', 400));
+    }
+    
+    const results = [];
+    
+    for (const teamData of teams) {
+      const { name, leaderEmail } = teamData;
+      
+      if (!name || !leaderEmail) {
+        continue; // 跳过无效的团队数据
+      }
+      
+      // 查找或创建学生
+      let student = await Student.findOne({ email: leaderEmail });
+      
+      if (!student) {
+        // 如果学生不存在，创建一个新学生
+        student = new Student({
+          name: leaderEmail.split('@')[0], // 使用邮箱前缀作为临时名称
+          email: leaderEmail,
+          // 其他字段可以在学生首次登录时更新
+        });
+        
+        await student.save();
+      }
+      
+      // 生成唯一的邀请码
+      const inviteCode = crypto.randomBytes(16).toString('hex');
+      
+      // 创建团队
+      const team = new Team({
+        name,
+        course: courseId,
+        members: [{
+          userId: student._id,
+          role: 'leader'
+        }],
+        inviteCode,
+        repositoryUrl: '' // 初始为空，由团队领导提交
+      });
+      
+      await team.save();
+      
+      // 生成邀请链接
+      const inviteLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/invite/${inviteCode}`;
+      
+      results.push({
+        teamName: name,
+        leaderEmail,
+        teamId: team._id,
+        inviteCode,
+        inviteLink
+      });
+    }
+    
+    res.status(201).json(results);
+  } catch (error) {
+    next(new AppError('Failed to create teams', 500));
+  }
+});
 
 router.put('/:id', async (req: Request, res: Response) => {
   try {
@@ -458,6 +569,50 @@ router.delete('/:id/members/:memberId', async (req: Request, res: Response, next
     res.status(200).json({ message: 'Member removed successfully' });
   } catch (error) {
     next(new AppError('Failed to remove team member', 500));
+  }
+});
+
+// 通过邀请码获取团队
+router.get('/invite/:inviteCode', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const team = await Team.findOne({ inviteCode: req.params.inviteCode })
+      .populate('members.userId');
+    
+    if (!team) {
+      return next(new AppError('Invalid invite code', 404));
+    }
+    
+    res.json({ team });
+  } catch (error) {
+    next(new AppError('Failed to verify invite', 500));
+  }
+});
+
+// 更新团队仓库URL
+router.put('/:id/repository', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { repositoryUrl } = req.body;
+    
+    if (!repositoryUrl) {
+      return next(new AppError('Repository URL is required', 400));
+    }
+    
+    // 查找团队
+    const team = await Team.findById(id);
+    
+    if (!team) {
+      return next(new AppError('Team not found', 404));
+    }
+    
+    // 更新仓库URL
+    team.repositoryUrl = repositoryUrl;
+    
+    await team.save();
+    
+    res.status(200).json({ message: 'Repository URL updated successfully' });
+  } catch (error) {
+    next(new AppError('Failed to update repository URL', 500));
   }
 });
 

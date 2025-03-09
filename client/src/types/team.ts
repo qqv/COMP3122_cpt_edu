@@ -32,6 +32,13 @@ export interface Team {
   issues: number
   prs: number
   lastActive: string
+  course: {
+    _id: string
+    name: string
+  }
+  inviteCode: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface TeamDetails extends Team {

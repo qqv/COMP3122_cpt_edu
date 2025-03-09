@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import Student from '../models/student'
-import type { Request, Response } from 'express'
+import type { Request, Response, NextFunction } from 'express'
+import { AppError } from '../middleware/error'
 
 const router = Router()
 
@@ -13,15 +14,15 @@ router.get('/', async (req: Request, res: Response) => {
   }
 })
 
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const student = await Student.findById(req.params.id)
+    const student = await Student.findById(req.params.id).lean()
     if (!student) {
-      return res.status(404).json({ message: 'Student not found' })
+      return next(new AppError('Student not found', 404))
     }
-    res.json(student)
+    res.status(200).json(student)
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching student' })
+    next(new AppError('Error fetching student', 500))
   }
 })
 
@@ -60,6 +61,32 @@ router.delete('/:id', async (req: Request, res: Response) => {
     res.json({ message: 'Student deleted successfully' })
   } catch (error) {
     res.status(500).json({ message: 'Error deleting student' })
+  }
+})
+
+// 搜索学生
+router.post('/search', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { query } = req.body
+    
+    if (!query || typeof query !== 'string') {
+      return next(new AppError('Search query is required', 400))
+    }
+    
+    // 使用正则表达式进行不区分大小写的搜索
+    const searchRegex = new RegExp(query, 'i')
+    
+    // 搜索名称或邮箱匹配的学生
+    const students = await Student.find({
+      $or: [
+        { name: searchRegex },
+        { email: searchRegex }
+      ]
+    }).limit(10).lean()
+    
+    res.status(200).json(students)
+  } catch (error) {
+    next(new AppError('Error searching students', 500))
   }
 })
 
