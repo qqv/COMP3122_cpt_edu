@@ -3,8 +3,8 @@ import jwt from 'jsonwebtoken';
 import { AppError } from './error';
 import User, { UserRole } from '../models/user';
 
-// 调试模式：跳过身份验证
-const DEBUG_MODE = true;
+// 调试模式：可以设置为 false 来使用真实的身份验证
+const DEBUG_MODE = false;
 const DEBUG_USER = {
   _id: 'debug123',
   name: 'Debug Lecturer',

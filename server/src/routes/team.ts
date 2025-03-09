@@ -267,7 +267,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     await team.save();
     
     // 生成邀请链接
-    const inviteLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/invite/${inviteCode}`;
+    const inviteLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/teams/invite/${inviteCode}`;
     
     res.status(201).json({
       message: 'Team created successfully',
@@ -330,7 +330,7 @@ router.post('/batch', async (req: Request, res: Response, next: NextFunction) =>
       await team.save();
       
       // 生成邀请链接
-      const inviteLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/invite/${inviteCode}`;
+      const inviteLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/teams/invite/${inviteCode}`;
       
       results.push({
         teamName: name,

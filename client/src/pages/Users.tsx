@@ -36,7 +36,8 @@ import {
   Refresh as RefreshIcon,
   LockReset as LockResetIcon,
   School as SchoolIcon,
-  ArrowBack as ArrowBackIcon
+  ArrowBack as ArrowBackIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { userService, courseService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -88,6 +89,9 @@ export default function Users() {
     message: '',
     severity: 'success'
   });
+  // 添加搜索状态
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
 
   // 检查用户是否有权限访问此页面
   if (user?.role !== 'lecturer') {
@@ -126,6 +130,7 @@ export default function Users() {
           courseService.getAllCourses()
         ]);
         setUsers(usersData);
+        setFilteredUsers(usersData); // 初始化过滤后的用户列表
         setCourses(coursesData);
         setError(null);
       } catch (err) {
@@ -137,6 +142,25 @@ export default function Users() {
 
     fetchData();
   }, []);
+
+  // 添加搜索处理函数
+  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const query = event.target.value;
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      setFilteredUsers(users);
+      return;
+    }
+    
+    const filtered = users.filter(user => 
+      user.name.toLowerCase().includes(query.toLowerCase()) ||
+      user.email.toLowerCase().includes(query.toLowerCase()) ||
+      user.role.toLowerCase().includes(query.toLowerCase())
+    );
+    
+    setFilteredUsers(filtered);
+  };
 
   // 处理表单输入变化
   const handleInputChange = (e) => {
@@ -343,18 +367,47 @@ export default function Users() {
         }}
       >
         <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-          <Paper sx={{ p: 3 }}>
+          <Paper sx={{ p: 3, mb: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h5">User Management</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Typography variant="h5" component="h1" sx={{ mr: 2 }}>
+                  User Management
+                </Typography>
+                <TextField
+                  placeholder="Search users..."
+                  size="small"
+                  value={searchQuery}
+                  onChange={handleSearch}
+                  sx={{ width: 250 }}
+                  InputProps={{
+                    startAdornment: (
+                      <Box component="span" sx={{ color: 'text.secondary', mr: 1 }}>
+                        <SearchIcon fontSize="small" />
+                      </Box>
+                    ),
+                  }}
+                />
+              </Box>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={handleOpenCreateDialog}
+                onClick={() => {
+                  setFormData({
+                    name: '',
+                    email: '',
+                    role: 'tutor',
+                    password: '',
+                    courses: [],
+                    active: true
+                  });
+                  setCreateDialogOpen(true);
+                }}
               >
                 Add User
               </Button>
             </Box>
-
+          </Paper>
+          <Paper sx={{ p: 3 }}>
             {error && (
               <Alert severity="error" sx={{ mb: 3 }}>
                 {error}
@@ -369,18 +422,18 @@ export default function Users() {
                     <TableCell>Email</TableCell>
                     <TableCell>Role</TableCell>
                     <TableCell>Courses</TableCell>
-                    <TableCell>Actions</TableCell>
+                    <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {users && users.length > 0 ? (
-                    users.map((user) => (
+                  {filteredUsers && filteredUsers.length > 0 ? (
+                    filteredUsers.map((user) => (
                       <TableRow key={user._id}>
                         <TableCell>{user.name}</TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
-                          <Chip
-                            label={user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                          <Chip 
+                            label={user.role.charAt(0).toUpperCase() + user.role.slice(1)} 
                             color={
                               user.role === 'lecturer'
                                 ? 'primary'
@@ -412,7 +465,7 @@ export default function Users() {
                             )}
                           </Box>
                         </TableCell>
-                        <TableCell>
+                        <TableCell align="right">
                           <Tooltip title="Edit User">
                             <IconButton
                               size="small"

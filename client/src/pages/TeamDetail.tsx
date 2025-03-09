@@ -61,7 +61,7 @@ import { getGithubAvatarUrl } from '../utils/github'
 import { TeamDetails } from '../types/team'
 import { formatLastActive } from '../utils/dateFormat'
 
-// 添加类型定义
+// Available Student
 interface AvailableStudent {
   _id: string;
   name: string;
@@ -99,13 +99,13 @@ export default function TeamDetail() {
         setTeam(data);
         setError(null);
         
-        // 检查课程ID是否存在
+        // Check if course ID exists
         if (data?.course) {
-          // 如果课程是对象并且有name属性，直接使用
+          // If course is an object and has a name property, use it directly
           if (typeof data.course === 'object' && data.course.name) {
             setCourseName(data.course.name);
           } 
-          // 否则，使用课程ID获取课程详情
+          // Otherwise, use course ID to get course details
           else {
             const courseId = typeof data.course === 'object' ? data.course._id : data.course;
             try {
@@ -132,17 +132,17 @@ export default function TeamDetail() {
   const activityData = useMemo(() => {
     if (!team?.analytics?.commitActivity) return [];
     
-    // 复制数组并反转，使时间从左到右
+    // Copy array and reverse to make time from left to right
     let filteredActivity = [...team.analytics.commitActivity];
     
-    // 根据选择的时间范围过滤数据
+    // Filter data based on selected time range
     if (timeRange === '7days') {
       filteredActivity = filteredActivity.slice(0, 7);
     } else if (timeRange === '14days') {
       filteredActivity = filteredActivity.slice(0, 14);
     }
     
-    // 反转数组，使时间从左到右
+    // Reverse array to make time from left to right
     return filteredActivity.reverse().map(item => ({
       date: new Date(item.date).toLocaleDateString(),
       commits: item.count
@@ -200,10 +200,10 @@ export default function TeamDetail() {
   const handleExportCSV = () => {
     if (!team) return;
     
-    // 准备 CSV 标题行
+    // Prepare CSV headers
     const headers = ['Name', 'Email', 'Role', 'Commits', 'PRs', 'Last Active'];
     
-    // 准备数据行
+    // Prepare data rows
     const rows = team.memberStats.map(member => [
       member.userId.name,
       member.userId.email,
@@ -213,7 +213,7 @@ export default function TeamDetail() {
       member.contribution.lastCommit ? new Date(member.contribution.lastCommit).toLocaleDateString() : 'N/A'
     ]);
     
-    // 添加团队总计行
+    // Add total row for team
     rows.push([
       'TOTAL',
       '',
@@ -223,16 +223,16 @@ export default function TeamDetail() {
       ''
     ]);
     
-    // 转换为 CSV 格式
+    // Convert to CSV format
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(cell => 
-        // 处理包含逗号的字段，用引号包裹
+        // Handle fields with commas, wrap them in quotes
         typeof cell === 'string' && cell.includes(',') ? `"${cell}"` : cell
       ).join(','))
     ].join('\n');
     
-    // 创建并下载文件
+    // Create and download file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -246,16 +246,16 @@ export default function TeamDetail() {
   const handleDeleteTeam = async () => {
     if (!team) return;
     
-    // 检查确认文本是否匹配团队名称
+    // Check if confirm text matches team name
     if (deleteConfirmText !== team.name) {
       setDeleteError('Team name does not match');
       return;
     }
     
     try {
-      // 调用 API 删除团队
+      // Call API to delete team
       await teamService.deleteTeam(team._id);
-      // 重定向到团队列表页面
+      // Redirect to team list page
       window.location.href = '/';
     } catch (error) {
       console.error('Error deleting team:', error);
@@ -263,13 +263,13 @@ export default function TeamDetail() {
     }
   };
 
-  // 计算与上周相比的百分比变化
+  // Calculate percentage change compared to last week
   const calculatePercentChange = (current: number, previous: number) => {
     if (previous === 0) return current > 0 ? 100 : 0;
     return Math.round(((current - previous) / previous) * 100);
   };
 
-  // 在 useMemo 中添加统计数据计算
+  // Add stats data calculation in useMemo
   const statsData = useMemo(() => {
     if (!team?.analytics) {
       return {
@@ -280,7 +280,7 @@ export default function TeamDetail() {
       };
     }
 
-    // 获取本周和上周的提交数
+    // Get commits for this week and last week
     const commitActivity = team.analytics.commitActivity || [];
     const thisWeekCommits = commitActivity.slice(0, 7).reduce((sum, day) => sum + day.count, 0);
     const lastWeekCommits = commitActivity.slice(7, 14).reduce((sum, day) => sum + day.count, 0);
@@ -305,11 +305,11 @@ export default function TeamDetail() {
     };
   }, [team]);
 
-  // 修改 recentActivity 数据计算
+  // Modify recentActivity data calculation
   const recentActivity = useMemo(() => {
     if (!team?.recentActivity || !team?.memberStats) return [];
     
-    // 创建 GitHub ID 到团队成员的映射
+    // Create mapping from GitHub ID to team member
     const memberMap = new Map();
     team.memberStats.forEach(member => {
       if (member.userId.githubId) {
@@ -320,7 +320,7 @@ export default function TeamDetail() {
           avatar: getGithubAvatarUrl(member.userId.githubId)
         });
       }
-      // 也可以用邮箱作为备用匹配方式
+      // Use email as backup matching method
       if (member.userId.email) {
         memberMap.set(member.userId.email.toLowerCase(), {
           id: member.userId._id,
@@ -331,13 +331,13 @@ export default function TeamDetail() {
       }
     });
     
-    // 处理最近活动数据，匹配团队成员
+    // Process recent activity data, match team members
     return team.recentActivity.map(activity => {
-      // 尝试通过 GitHub ID 或邮箱匹配团队成员
+      // Try matching team member by GitHub ID or email
       const githubId = activity.author.githubId?.toLowerCase();
       const email = activity.author.email?.toLowerCase();
       
-      // 查找匹配的团队成员
+      // Find matching team member
       const teamMember = 
         (githubId && memberMap.get(githubId)) || 
         (email && memberMap.get(email)) ||
@@ -356,7 +356,7 @@ export default function TeamDetail() {
     });
   }, [team]);
 
-  // 完全替换 teamProgress 函数
+  // Replace teamProgress function
   const teamProgress = useMemo(() => {
     if (!team || !team.analytics) return {
       issues: { total: 0, change: 0 },
@@ -364,12 +364,12 @@ export default function TeamDetail() {
       reviews: { total: 0, change: 0 }
     };
 
-    // 安全地获取值
+    // Safely get values
     const issuesValue = team.analytics?.issues ?? 0;
     const prsValue = team.analytics?.totalPRs ?? 0;
     const reviewsValue = team.analytics?.reviews ?? 0;
 
-    // 安全的计算百分比变化函数
+    // Safe calculation of percentage change
     const safeCalculateChange = (current: number, previous: number): number => {
       if (previous === 0) return 0;
       return Math.round(((current - previous) / previous) * 100);
@@ -391,24 +391,24 @@ export default function TeamDetail() {
     };
   }, [team]);
 
-  // 添加团队成员贡献数据计算
+  // Add team member contribution data calculation
   const memberContributions = useMemo(() => {
     if (!team?.memberStats) return {
       commits: [],
       prs: []
     };
     
-    // 计算每个成员的贡献百分比
+    // Calculate contribution percentage for each member
     const totalCommits = team.memberStats.reduce((sum, member) => sum + member.contribution.commits, 0);
     const totalPRs = team.memberStats.reduce((sum, member) => sum + (member.contribution.prs || 0), 0);
     
-    // 为每个成员分配一个颜色
+    // Assign a color to each member
     const memberColors = {};
     team.memberStats.forEach((member, index) => {
       memberColors[member.userId._id] = `hsl(${(index * 360) / team.memberStats.length}, 70%, 50%)`;
     });
 
-    // 计算每个成员的贡献百分比
+    // Calculate contribution percentage for each member
     const commitContributions = team.memberStats
       .filter(member => member.contribution.commits > 0)
       .map(member => ({
@@ -457,21 +457,21 @@ export default function TeamDetail() {
     try {
       setActionError('');
       
-      // 调用 API 添加成员
+      // Call API to add member
       await teamService.addTeamMember(team._id, selectedStudentId);
       
-      // 显示成功消息
+      // Show success message
       setActionSuccess('Member added successfully');
       
-      // 关闭对话框并重新加载团队数据
+      // Close dialog and reload team data
       setAddMemberDialogOpen(false);
       setSelectedStudentId('');
       
-      // 重新加载团队数据
+      // Reload team data
       const updatedTeam = await teamService.getTeamDetails(team._id);
       setTeam(updatedTeam);
       
-      // 3秒后清除成功消息
+      // Clear success message after 3 seconds
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (error) {
       console.error('Error adding team member:', error);
@@ -485,21 +485,21 @@ export default function TeamDetail() {
     try {
       setActionError('');
       
-      // 调用 API 更改团队领导
+      // Call API to change team leader
       await teamService.changeTeamLeader(team._id, newLeaderId);
       
-      // 显示成功消息
+      // Show success message
       setActionSuccess('Team leader changed successfully');
       
-      // 关闭对话框并重新加载团队数据
+      // Close dialog and reload team data
       setChangeLeaderDialogOpen(false);
       setNewLeaderId('');
       
-      // 重新加载团队数据
+      // Reload team data
       const updatedTeam = await teamService.getTeamDetails(team._id);
       setTeam(updatedTeam);
       
-      // 3秒后清除成功消息
+      // Clear success message after 3 seconds
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (error) {
       console.error('Error changing team leader:', error);
@@ -507,7 +507,7 @@ export default function TeamDetail() {
     }
   };
 
-  // 添加移除成员的函数
+  // Remove member function
   const handleRemoveMember = async (memberId: string) => {
     try {
       if (!id) {
@@ -516,13 +516,13 @@ export default function TeamDetail() {
       
       await teamService.removeTeamMember(id, memberId);
       
-      // 刷新团队数据
+      // Reload team data
       const updatedTeam = await teamService.getTeamDetails(id);
       setTeam(updatedTeam);
       
       setActionSuccess('Member removed successfully');
       
-      // 3秒后清除成功消息
+      // Clear success message after 3 seconds
       setTimeout(() => {
         setActionSuccess('');
       }, 3000);

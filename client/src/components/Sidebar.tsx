@@ -10,32 +10,52 @@ import {
   Typography,
   Divider,
   Avatar,
-  Stack
+  Stack,
+  Button,
+  Tooltip
 } from '@mui/material'
 import {
   Dashboard as DashboardIcon,
   Group as GroupIcon,
   School as SchoolIcon,
   Analytics as AnalyticsIcon,
-  Description as ReportIcon,
+  Assessment as AssessmentIcon,
+  Assistant as AssistantIcon,
   Settings as SettingsIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  Person as PersonIcon
 } from '@mui/icons-material'
+import { useAuth } from '../contexts/AuthContext'
 
-const menuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-  { text: 'Teams', icon: <GroupIcon />, path: '/teams' },
-  { text: 'Students', icon: <SchoolIcon />, path: '/students' },
-  { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
-  { text: 'Reports', icon: <ReportIcon />, path: '/reports' },
-  { text: 'Users', icon: <GroupIcon />, path: '/users' },
-  { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
-]
+const drawerWidth = 240
 
 export default function Sidebar() {
   const navigate = useNavigate()
   const location = useLocation()
-  const drawerWidth = 240
+  const { user, logout } = useAuth()
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      navigate('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
+
+  const menuItems = [
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+    { text: 'Teams', icon: <GroupIcon />, path: '/teams' },
+    { text: 'Students', icon: <SchoolIcon />, path: '/students' },
+    { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
+    { text: 'AI Assistant', icon: <AssistantIcon />, path: '/assistant' },
+    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+  ]
+
+  // 只有讲师才能看到用户管理
+  if (user?.role === 'lecturer') {
+    menuItems.push({ text: 'Users', icon: <PersonIcon />, path: '/users' })
+  }
 
   return (
     <Drawer
@@ -46,43 +66,72 @@ export default function Sidebar() {
         '& .MuiDrawer-paper': {
           width: drawerWidth,
           boxSizing: 'border-box',
-          bgcolor: 'grey.900',
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100vh'
-        },
+          bgcolor: 'background.paper',
+          borderRight: '1px solid',
+          borderColor: 'divider'
+        }
       }}
     >
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {/* Header */}
-        <Box sx={{ p: 3, bgcolor: 'grey.900' }}>
-          <Typography variant="h6" sx={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
-            GitHub Classroom
+      <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <SchoolIcon sx={{ color: 'primary.main', mr: 1, fontSize: 30 }} />
+          <Typography variant="h6" color="primary.main" fontWeight="bold">
+            CPT Classroom
           </Typography>
         </Box>
-        <Divider sx={{ bgcolor: 'grey.800' }} />
 
-        {/* Navigation Menu */}
-        <List sx={{ px: 2, py: 1, flex: 1 }}>
+        <Divider sx={{ mb: 2 }} />
+
+        {/* 用户信息 */}
+        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', px: 1 }}>
+          <Avatar 
+            sx={{ width: 40, height: 40, mr: 2, bgcolor: 'primary.main' }}
+          >
+            {user?.name?.charAt(0) || 'U'}
+          </Avatar>
+          <Box sx={{ overflow: 'hidden' }}>
+            <Typography variant="subtitle1" noWrap fontWeight="medium">
+              {user?.name || 'User'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {user?.role ? `${user.role.charAt(0).toUpperCase()}${user.role.slice(1)}` : 'Role'}
+            </Typography>
+          </Box>
+        </Box>
+
+        <Divider sx={{ mb: 2 }} />
+
+        <List component="nav" sx={{ flexGrow: 1 }}>
           {menuItems.map((item) => (
             <ListItem
               button
               key={item.text}
               onClick={() => navigate(item.path)}
+              selected={location.pathname === item.path}
               sx={{
                 borderRadius: 1,
                 mb: 0.5,
-                color: 'grey.300',
-                '&:hover': {
-                  bgcolor: 'grey.800',
+                '&.Mui-selected': {
+                  bgcolor: 'primary.lighter',
+                  color: 'primary.main',
+                  '&:hover': {
+                    bgcolor: 'primary.lighter',
+                  },
+                  '& .MuiListItemIcon-root': {
+                    color: 'primary.main',
+                  },
                 },
-                ...(location.pathname === item.path && {
-                  bgcolor: 'grey.800',
-                  color: 'white',
-                }),
+                '&:hover': {
+                  bgcolor: 'grey.100',
+                },
               }}
             >
-              <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
+              <ListItemIcon
+                sx={{
+                  minWidth: 40,
+                  color: location.pathname === item.path ? 'primary.main' : 'inherit',
+                }}
+              >
                 {item.icon}
               </ListItemIcon>
               <ListItemText primary={item.text} />
@@ -90,39 +139,30 @@ export default function Sidebar() {
           ))}
         </List>
 
-        <Divider sx={{ bgcolor: 'grey.800' }} />
-
-        {/* User Profile Section */}
-        <Box sx={{ p: 2 }}>
-          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-            <Avatar sx={{ width: 32, height: 32 }}>JW</Avatar>
-            <Box>
-              <Typography variant="subtitle2" sx={{ color: 'white' }}>
-                Dr. Wong, Jane
-              </Typography>
-              <Typography variant="caption" sx={{ color: 'grey.500' }}>
-                Instructor
-              </Typography>
-            </Box>
-          </Stack>
-
-          {/* Logout Button */}
-          <ListItem
-            button
-            onClick={() => navigate('/login')}
-            sx={{
-              borderRadius: 1,
-              color: 'grey.300',
-              '&:hover': {
-                bgcolor: 'grey.800',
-              },
-            }}
-          >
-            <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
-              <LogoutIcon />
-            </ListItemIcon>
-            <ListItemText primary="Logout" />
-          </ListItem>
+        <Box>
+          <Divider sx={{ my: 2 }} />
+          <Tooltip title="Logout">
+            <ListItem
+              button
+              onClick={handleLogout}
+              sx={{
+                borderRadius: 1,
+                color: 'grey.700',
+                '&:hover': {
+                  bgcolor: 'grey.100',
+                  color: 'error.main',
+                  '& .MuiListItemIcon-root': {
+                    color: 'error.main',
+                  },
+                },
+              }}
+            >
+              <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
+                <LogoutIcon />
+              </ListItemIcon>
+              <ListItemText primary="Logout" />
+            </ListItem>
+          </Tooltip>
         </Box>
       </Box>
     </Drawer>

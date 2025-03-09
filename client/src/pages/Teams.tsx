@@ -50,7 +50,8 @@ import {
   ArrowForward as ArrowForwardIcon,
   ContentCopy as ContentCopyIcon,
   Delete as DeleteIcon,
-  Email as EmailIcon
+  Email as EmailIcon,
+  CloudUpload as CloudUploadIcon
 } from '@mui/icons-material'
 import Sidebar from '../components/Sidebar'
 import { useNavigate } from 'react-router-dom'
@@ -103,12 +104,15 @@ export default function Teams() {
     message: '',
     severity: 'success'
   });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredTeams, setFilteredTeams] = useState<any[]>([]);
 
   // 将 fetchTeams 提取为独立函数
   const fetchTeams = async () => {
     try {
       const data = await teamService.getTeams()
       setTeams(data)
+      setFilteredTeams(data) // 初始化过滤后的团队列表
       setError(null)
     } catch (err: any) {
       setError(err.message)
@@ -137,8 +141,26 @@ export default function Teams() {
     fetchCourses();
   }, []);
 
+  // 添加搜索处理函数
+  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const query = event.target.value;
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      setFilteredTeams(teams);
+      return;
+    }
+    
+    const filtered = teams.filter(team => 
+      team.name.toLowerCase().includes(query.toLowerCase()) ||
+      (team.course?.name && team.course.name.toLowerCase().includes(query.toLowerCase()))
+    );
+    
+    setFilteredTeams(filtered);
+  };
+
   const sortedTeams = useMemo(() => {
-    return [...teams].sort((a, b) => {
+    return [...filteredTeams].sort((a, b) => {
       // 首先按仓库存在状态排序
       if (!a.exists && b.exists) return -1
       if (a.exists && !b.exists) return 1
@@ -151,7 +173,7 @@ export default function Teams() {
       // 如果都不存在，按名称排序
       return a.name.localeCompare(b.name)
     })
-  }, [teams])
+  }, [filteredTeams])
 
   const handleCreateTeam = async () => {
     try {
@@ -243,16 +265,23 @@ export default function Teams() {
   const handleSearchLeader = async () => {
     try {
       if (!leaderSearchQuery.trim()) {
-        setCreateError('Please enter a search query');
+        setLeaderSearchResults([]);
         return;
       }
       
-      // 调用API搜索学生
-      const results = await studentService.searchStudents(leaderSearchQuery);
-      setLeaderSearchResults(results);
-      setCreateError('');
-    } catch (error: any) {
-      setCreateError(error.message || 'Failed to search students');
+      const response = await studentService.searchStudents(leaderSearchQuery);
+      console.log('Search response:', response); // 调试日志
+      
+      // 确保我们正确访问返回的数据
+      if (response && response.students) {
+        setLeaderSearchResults(response.students);
+      } else {
+        setLeaderSearchResults([]);
+        console.error('Unexpected response format:', response);
+      }
+    } catch (error) {
+      console.error('Error searching for students:', error);
+      setLeaderSearchResults([]);
     }
   };
 
@@ -310,19 +339,38 @@ export default function Teams() {
       <Box component="main" sx={{ flexGrow: 1, height: '100vh', overflow: 'auto', bgcolor: 'grey.100' }}>
 
         <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-          {/* Search and Actions */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-            <Typography variant="h5">Teams</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Typography variant="h5" component="h1" sx={{ mr: 2 }}>
+                Teams
+              </Typography>
+              <TextField
+                placeholder="Search teams..."
+                size="small"
+                value={searchQuery}
+                onChange={handleSearch}
+                sx={{ width: 250 }}
+                InputProps={{
+                  startAdornment: (
+                    <Box component="span" sx={{ color: 'text.secondary', mr: 1 }}>
+                      <SearchIcon fontSize="small" />
+                    </Box>
+                  ),
+                }}
+              />
+            </Box>
             <Box>
-              <Button 
-                variant="outlined" 
+              <Button
+                variant="outlined"
+                startIcon={<CloudUploadIcon />}
                 onClick={() => setBatchDialogOpen(true)}
                 sx={{ mr: 2 }}
               >
                 Batch Create
               </Button>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
                 onClick={() => setCreateDialogOpen(true)}
               >
                 Create Team
@@ -332,8 +380,8 @@ export default function Teams() {
 
           {/* Teams Grid */}
           <Grid container spacing={3}>
-            {sortedTeams.map((team) => (
-              <Grid item xs={12} md={6} lg={4} key={team._id}>
+            {sortedTeams.map(team => (
+              <Grid item xs={12} sm={6} md={4} key={team._id}>
                 <TeamCard 
                   team={team} 
                   onCopyInvite={handleCopyInviteLink}
@@ -420,25 +468,30 @@ export default function Teams() {
                   />
                   
                   {leaderSearchResults.length > 0 && (
-                    <Paper variant="outlined" sx={{ mt: 2, maxHeight: 200, overflow: 'auto' }}>
-                      <List dense>
-                        {leaderSearchResults.map(student => (
-                          <ListItem 
-                            key={student._id}
-                            button
-                            onClick={() => handleSelectLeader(student)}
-                          >
-                            <ListItemAvatar>
-                              <Avatar src={getGithubAvatarUrl(student.githubId)} />
-                            </ListItemAvatar>
-                            <ListItemText 
-                              primary={student.name}
-                              secondary={student.email}
-                            />
-                          </ListItem>
-                        ))}
-                      </List>
-                    </Paper>
+                    <List sx={{ mt: 2, maxHeight: 200, overflow: 'auto' }}>
+                      {leaderSearchResults.map((student) => (
+                        <ListItem
+                          key={student._id}
+                          button
+                          onClick={() => {
+                            setSelectedLeader(student);
+                            setNewTeamLeaderEmail(student.email);
+                            setLeaderSearchQuery('');
+                            setLeaderSearchResults([]);
+                          }}
+                        >
+                          <ListItemAvatar>
+                            <Avatar src={getGithubAvatarUrl(student.githubId)} />
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={student.name}
+                            secondary={student.email}
+                            primaryTypographyProps={{ variant: 'body1', component: 'span' }}
+                            secondaryTypographyProps={{ component: 'span' }}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
                   )}
                 </>
               )}

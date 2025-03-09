@@ -32,7 +32,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { teamService, studentService } from '../services/api';
 import { getGithubAvatarUrl } from '../utils/github';
 
-// 添加类型定义
+// Available Student
 interface Student {
   _id: string;
   name: string;
@@ -72,7 +72,7 @@ export default function TeamInvite() {
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
   
-  // 获取邀请信息
+  // Get invite information
   useEffect(() => {
     const verifyInvite = async () => {
       try {
@@ -88,7 +88,7 @@ export default function TeamInvite() {
     verifyInvite();
   }, [inviteCode]);
   
-  // 提交仓库URL
+  // Submit repository URL
   const handleSubmitRepository = async () => {
     try {
       if (!teamData) return;
@@ -98,16 +98,16 @@ export default function TeamInvite() {
         return;
       }
       
-      // 验证URL格式
+      // Validate URL format
       if (!repositoryUrl.match(/^https:\/\/github\.com\/[\w-]+\/[\w-]+$/)) {
         setActionError('Invalid GitHub repository URL format');
         return;
       }
       
-      // 更新仓库URL
+      // Update repository URL
       await teamService.updateTeamRepository(teamData._id, repositoryUrl);
       
-      // 使用 verifyInvite 获取完整的团队数据
+      // Get full team data using verifyInvite
       const response = await teamService.verifyInvite(inviteCode!);
       setTeamData(response.team);
       
@@ -115,7 +115,7 @@ export default function TeamInvite() {
       setActionError('');
       setActiveStep(1);
       
-      // 3秒后清除成功消息
+      // Clear success message after 3 seconds
       setTimeout(() => {
         setActionSuccess('');
       }, 3000);
@@ -125,7 +125,7 @@ export default function TeamInvite() {
     }
   };
   
-  // 搜索学生
+  // Search students
   const handleSearchStudents = async () => {
     try {
       if (!teamData || !searchQuery.trim()) {
@@ -142,7 +142,7 @@ export default function TeamInvite() {
         return;
       }
 
-      // 过滤掉已经是团队成员的学生
+      // Filter out students who are already team members
       const teamMemberIds = teamData.members.map(member => member.userId._id);
       const filteredResults = students.filter(student => 
         !teamMemberIds.includes(student._id)
@@ -157,9 +157,9 @@ export default function TeamInvite() {
     }
   };
   
-  // 添加团队成员
+  // Add team member
   const handleAddMember = (student: Student) => {
-    // 检查是否已经选择了该学生
+    // Check if student is already selected
     if (selectedMembers.some(member => member._id === student._id)) {
       setActionError('This student is already selected');
       return;
@@ -169,12 +169,12 @@ export default function TeamInvite() {
     setActionError('');
   };
   
-  // 移除选择的成员
+  // Remove selected member
   const handleRemoveSelectedMember = (studentId: string) => {
     setSelectedMembers(selectedMembers.filter(student => student._id !== studentId));
   };
   
-  // 提交团队成员
+  // Submit team members
   const handleSubmitMembers = async () => {
     try {
       if (!teamData || selectedMembers.length === 0) {
@@ -187,15 +187,15 @@ export default function TeamInvite() {
           await teamService.addTeamMember(teamData._id, student._id);
         } catch (err) {
           console.error(`Failed to add member ${student.name}:`, err);
-          continue; // 继续添加其他成员
+          continue; // Continue adding other members
         }
       }
 
-      // 刷新团队数据
+      // Refresh team data
       const response = await teamService.verifyInvite(inviteCode!);
       setTeamData(response.team);
       
-      // 清空选择
+      // Clear selection
       setSelectedMembers([]);
       setSearchResults([]);
       setSearchQuery('');
@@ -206,7 +206,7 @@ export default function TeamInvite() {
     }
   };
   
-  // 完成设置
+  // Finish setup
   const handleFinish = () => {
     navigate('/teams');
   };
@@ -262,7 +262,7 @@ export default function TeamInvite() {
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
       <Paper sx={{ p: 4 }}>
-        {/* 团队基本信息 */}
+        {/* Team basic information */}
         {teamData && (
           <Box sx={{ mb: 4 }}>
             <Typography variant="h4" gutterBottom>
@@ -274,10 +274,10 @@ export default function TeamInvite() {
           </Box>
         )}
 
-        {/* 步骤内容 */}
+        {/* Step content */}
         {teamData && (
           <>
-            {/* 仓库设置步骤 */}
+            {/* Repository setup step */}
             {activeStep === 0 && (
               <Box>
                 <Typography variant="h6" gutterBottom>
@@ -312,7 +312,7 @@ export default function TeamInvite() {
               </Box>
             )}
 
-            {/* 成员管理步骤 */}
+            {/* Member management step */}
             {activeStep === 1 && (
               <Box>
                 <Typography variant="h6" gutterBottom>
@@ -499,7 +499,7 @@ export default function TeamInvite() {
           </>
         )}
 
-        {/* 错误和成功提示 */}
+        {/* Error and success prompts */}
         {actionError && (
           <Alert severity="error" sx={{ mt: 2 }}>
             {actionError}

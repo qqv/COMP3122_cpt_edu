@@ -213,9 +213,10 @@ export const studentService = {
   searchStudents: async (query: string) => {
     try {
       const { data } = await api.post('/students/search', { query });
-      return data;
+      console.log('API response data:', data); // 调试日志
+      return data; // 应该返回 { students: [...] }
     } catch (error: any) {
-      console.error('Search error:', error.response || error);
+      console.error('Search students error:', error.response || error);
       throw new Error(error.response?.data?.message || 'Failed to search students');
     }
   },
