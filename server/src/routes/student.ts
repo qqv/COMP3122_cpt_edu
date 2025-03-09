@@ -70,13 +70,10 @@ router.post('/search', async (req: Request, res: Response, next: NextFunction) =
     const { query } = req.body
     
     if (!query || typeof query !== 'string') {
-      return next(new AppError('Search query is required', 400))
+      return res.status(400).json({ message: 'Search query is required' })
     }
     
-    // 使用正则表达式进行不区分大小写的搜索
     const searchRegex = new RegExp(query, 'i')
-    
-    // 搜索名称或邮箱匹配的学生
     const students = await Student.find({
       $or: [
         { name: searchRegex },
@@ -84,7 +81,7 @@ router.post('/search', async (req: Request, res: Response, next: NextFunction) =
       ]
     }).limit(10).lean()
     
-    res.status(200).json(students)
+    res.status(200).json({ students })
   } catch (error) {
     next(new AppError('Error searching students', 500))
   }

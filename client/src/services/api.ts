@@ -215,6 +215,7 @@ export const studentService = {
       const { data } = await api.post('/students/search', { query });
       return data;
     } catch (error: any) {
+      console.error('Search error:', error.response || error);
       throw new Error(error.response?.data?.message || 'Failed to search students');
     }
   },

@@ -576,7 +576,8 @@ router.delete('/:id/members/:memberId', async (req: Request, res: Response, next
 router.get('/invite/:inviteCode', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const team = await Team.findOne({ inviteCode: req.params.inviteCode })
-      .populate('members.userId');
+      .populate('members.userId')
+      .populate('course');
     
     if (!team) {
       return next(new AppError('Invalid invite code', 404));

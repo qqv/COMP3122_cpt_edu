@@ -50,6 +50,11 @@ interface TeamData {
   name: string;
   repositoryUrl: string;
   members: TeamMember[];
+  course: {
+    _id: string;
+    name: string;
+  };
+  inviteCode: string;
 }
 
 export default function TeamInvite() {
@@ -99,15 +104,16 @@ export default function TeamInvite() {
         return;
       }
       
+      // 更新仓库URL
       await teamService.updateTeamRepository(teamData._id, repositoryUrl);
+      
+      // 使用 verifyInvite 获取完整的团队数据
+      const response = await teamService.verifyInvite(inviteCode!);
+      setTeamData(response.team);
       
       setActionSuccess('Repository URL saved successfully');
       setActionError('');
       setActiveStep(1);
-      
-      // 刷新团队数据
-      const updatedTeam = await teamService.getTeamByInviteCode(inviteCode || '');
-      setTeamData(updatedTeam);
       
       // 3秒后清除成功消息
       setTimeout(() => {
@@ -122,24 +128,32 @@ export default function TeamInvite() {
   // 搜索学生
   const handleSearchStudents = async () => {
     try {
-      if (!teamData) return;
-      
-      if (!searchQuery.trim()) {
-        setActionError('Search query is required');
+      if (!teamData || !searchQuery.trim()) {
+        setSearchResults([]);
         return;
       }
-      
-      const results = await studentService.searchStudents(searchQuery);
-      
+
+      const { students } = await studentService.searchStudents(searchQuery);
+      console.log('Search results:', students);
+
+      if (!Array.isArray(students)) {
+        console.warn('Unexpected response format:', students);
+        setSearchResults([]);
+        return;
+      }
+
       // 过滤掉已经是团队成员的学生
       const teamMemberIds = teamData.members.map(member => member.userId._id);
-      const filteredResults = results.filter(student => !teamMemberIds.includes(student._id));
+      const filteredResults = students.filter(student => 
+        !teamMemberIds.includes(student._id)
+      );
       
       setSearchResults(filteredResults);
       setActionError('');
     } catch (error: any) {
-      console.error('Error searching students:', error);
+      console.error('Search error details:', error);
       setActionError(error.message || 'Failed to search students');
+      setSearchResults([]);
     }
   };
   
@@ -163,37 +177,32 @@ export default function TeamInvite() {
   // 提交团队成员
   const handleSubmitMembers = async () => {
     try {
-      if (!teamData) return;
-      
-      if (selectedMembers.length === 0) {
-        setActionError('Please select at least one member');
+      if (!teamData || selectedMembers.length === 0) {
+        setActionError('Please select members to add');
         return;
       }
-      
-      // 添加所有选定的成员
+
       for (const student of selectedMembers) {
-        await teamService.addTeamMember(teamData._id, student._id);
+        try {
+          await teamService.addTeamMember(teamData._id, student._id);
+        } catch (err) {
+          console.error(`Failed to add member ${student.name}:`, err);
+          continue; // 继续添加其他成员
+        }
       }
-      
+
       // 刷新团队数据
-      const updatedTeam = await teamService.getTeamByInviteCode(inviteCode || '');
-      setTeamData(updatedTeam);
+      const response = await teamService.verifyInvite(inviteCode!);
+      setTeamData(response.team);
       
-      // 清空选定的成员
+      // 清空选择
       setSelectedMembers([]);
       setSearchResults([]);
       setSearchQuery('');
       
       setActionSuccess('Members added successfully');
-      setActionError('');
-      
-      // 3秒后清除成功消息
-      setTimeout(() => {
-        setActionSuccess('');
-      }, 3000);
     } catch (error: any) {
-      console.error('Error adding team members:', error);
-      setActionError(error.message || 'Failed to add team members');
+      setActionError('Some members could not be added. Please try again.');
     }
   };
   
@@ -251,243 +260,256 @@ export default function TeamInvite() {
   }
   
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="md" sx={{ mt: 4 }}>
       <Paper sx={{ p: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Join Team: {teamData.name}
-        </Typography>
-        
-        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-          <Step>
-            <StepLabel>Set Repository</StepLabel>
-          </Step>
-          <Step>
-            <StepLabel>Add Team Members</StepLabel>
-          </Step>
-        </Stepper>
+        {/* 团队基本信息 */}
+        {teamData && (
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h4" gutterBottom>
+              {teamData.name}
+            </Typography>
+            <Typography color="text.secondary">
+              Course: {teamData.course?.name || teamData.course?._id}
+            </Typography>
+          </Box>
+        )}
+
+        {/* 步骤内容 */}
+        {teamData && (
+          <>
+            {/* 仓库设置步骤 */}
+            {activeStep === 0 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Set GitHub Repository
+                </Typography>
+                
+                <Typography variant="body1" paragraph>
+                  Please enter your team's GitHub repository URL. This will be used to track your team's progress.
+                </Typography>
+                
+                <TextField
+                  label="GitHub Repository URL"
+                  fullWidth
+                  value={repositoryUrl}
+                  onChange={(e) => setRepositoryUrl(e.target.value)}
+                  margin="normal"
+                  placeholder="https://github.com/username/repository"
+                  InputProps={{
+                    startAdornment: <GitHubIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                  }}
+                />
+                
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button 
+                    variant="contained" 
+                    onClick={handleSubmitRepository}
+                    startIcon={<CheckIcon />}
+                  >
+                    Save and Continue
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
+            {/* 成员管理步骤 */}
+            {activeStep === 1 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Add Team Members
+                </Typography>
+                
+                <Typography variant="body1" paragraph>
+                  Search for students by name or email and add them to your team.
+                </Typography>
+                
+                <Box sx={{ display: 'flex', mb: 2 }}>
+                  <TextField
+                    label="Search Students"
+                    fullWidth
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Enter name or email"
+                    sx={{ mr: 2 }}
+                  />
+                  <Button 
+                    variant="contained" 
+                    onClick={handleSearchStudents}
+                    startIcon={<SearchIcon />}
+                  >
+                    Search
+                  </Button>
+                </Box>
+                
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Search Results
+                    </Typography>
+                    
+                    <Paper variant="outlined" sx={{ maxHeight: 300, overflow: 'auto', p: 1 }}>
+                      {searchResults.length > 0 ? (
+                        <List>
+                          {searchResults.map((student) => (
+                            <ListItem 
+                              key={student._id}
+                              secondaryAction={
+                                <IconButton 
+                                  edge="end" 
+                                  onClick={() => handleAddMember(student)}
+                                  title="Add to team"
+                                >
+                                  <PersonAddIcon />
+                                </IconButton>
+                              }
+                            >
+                              <ListItemAvatar>
+                                <Avatar src={getGithubAvatarUrl(student.githubId)} />
+                              </ListItemAvatar>
+                              <ListItemText 
+                                primary={student.name}
+                                secondary={student.email}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      ) : (
+                        <Box sx={{ p: 2, textAlign: 'center' }}>
+                          <Typography color="text.secondary">
+                            No results found
+                          </Typography>
+                        </Box>
+                      )}
+                    </Paper>
+                  </Grid>
+                  
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Selected Members
+                    </Typography>
+                    
+                    <Paper variant="outlined" sx={{ maxHeight: 300, overflow: 'auto', p: 1 }}>
+                      {selectedMembers.length > 0 ? (
+                        <List>
+                          {selectedMembers.map((student) => (
+                            <ListItem 
+                              key={student._id}
+                              secondaryAction={
+                                <IconButton 
+                                  edge="end" 
+                                  onClick={() => handleRemoveSelectedMember(student._id)}
+                                  title="Remove"
+                                  color="error"
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              }
+                            >
+                              <ListItemAvatar>
+                                <Avatar src={getGithubAvatarUrl(student.githubId)} />
+                              </ListItemAvatar>
+                              <ListItemText 
+                                primary={student.name}
+                                secondary={student.email}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      ) : (
+                        <Box sx={{ p: 2, textAlign: 'center' }}>
+                          <Typography color="text.secondary">
+                            No members selected
+                          </Typography>
+                        </Box>
+                      )}
+                    </Paper>
+                  </Grid>
+                </Grid>
+                
+                <Divider sx={{ my: 3 }} />
+                
+                <Typography variant="h6" gutterBottom>
+                  Current Team Members
+                </Typography>
+                
+                <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+                  {teamData.members && teamData.members.length > 0 ? (
+                    <List>
+                      {teamData.members.map((member) => (
+                        <ListItem key={member.userId._id}>
+                          <ListItemAvatar>
+                            <Avatar src={getGithubAvatarUrl(member.userId.githubId)} />
+                          </ListItemAvatar>
+                          <ListItemText 
+                            primary={
+                              <>
+                                {member.userId.name}
+                                {member.role === 'leader' && (
+                                  <Chip 
+                                    label="Leader" 
+                                    size="small" 
+                                    color="primary" 
+                                    sx={{ ml: 1 }}
+                                  />
+                                )}
+                              </>
+                            }
+                            secondary={member.userId.email}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  ) : (
+                    <Typography color="text.secondary" align="center">
+                      No team members yet
+                    </Typography>
+                  )}
+                </Paper>
+                
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setActiveStep(0)}
+                  >
+                    Back to Repository
+                  </Button>
+                  
+                  <Box>
+                    <Button 
+                      variant="contained" 
+                      color="primary"
+                      onClick={handleSubmitMembers}
+                      sx={{ mr: 2 }}
+                      disabled={selectedMembers.length === 0}
+                    >
+                      Add Selected Members
+                    </Button>
+                    
+                    <Button 
+                      variant="contained" 
+                      color="success"
+                      onClick={handleFinish}
+                    >
+                      Finish Setup
+                    </Button>
+                  </Box>
+                </Box>
+              </Box>
+            )}
+          </>
+        )}
+
+        {/* 错误和成功提示 */}
+        {actionError && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {actionError}
+          </Alert>
+        )}
         
         {actionSuccess && (
-          <Alert severity="success" sx={{ mb: 2 }}>{actionSuccess}</Alert>
-        )}
-        
-        {actionError && (
-          <Alert severity="error" sx={{ mb: 2 }}>{actionError}</Alert>
-        )}
-        
-        {activeStep === 0 ? (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Set GitHub Repository
-            </Typography>
-            
-            <Typography variant="body1" paragraph>
-              Please enter your team's GitHub repository URL. This will be used to track your team's progress.
-            </Typography>
-            
-            <TextField
-              label="GitHub Repository URL"
-              fullWidth
-              value={repositoryUrl}
-              onChange={(e) => setRepositoryUrl(e.target.value)}
-              margin="normal"
-              placeholder="https://github.com/username/repository"
-              InputProps={{
-                startAdornment: <GitHubIcon sx={{ mr: 1, color: 'text.secondary' }} />
-              }}
-            />
-            
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button 
-                variant="contained" 
-                onClick={handleSubmitRepository}
-                startIcon={<CheckIcon />}
-              >
-                Save and Continue
-              </Button>
-            </Box>
-          </Box>
-        ) : (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Add Team Members
-            </Typography>
-            
-            <Typography variant="body1" paragraph>
-              Search for students by name or email and add them to your team.
-            </Typography>
-            
-            <Box sx={{ display: 'flex', mb: 2 }}>
-              <TextField
-                label="Search Students"
-                fullWidth
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Enter name or email"
-                sx={{ mr: 2 }}
-              />
-              <Button 
-                variant="contained" 
-                onClick={handleSearchStudents}
-                startIcon={<SearchIcon />}
-              >
-                Search
-              </Button>
-            </Box>
-            
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Search Results
-                </Typography>
-                
-                <Paper variant="outlined" sx={{ maxHeight: 300, overflow: 'auto', p: 1 }}>
-                  {searchResults.length > 0 ? (
-                    <List>
-                      {searchResults.map((student) => (
-                        <ListItem 
-                          key={student._id}
-                          secondaryAction={
-                            <IconButton 
-                              edge="end" 
-                              onClick={() => handleAddMember(student)}
-                              title="Add to team"
-                            >
-                              <PersonAddIcon />
-                            </IconButton>
-                          }
-                        >
-                          <ListItemAvatar>
-                            <Avatar src={getGithubAvatarUrl(student.githubId)} />
-                          </ListItemAvatar>
-                          <ListItemText 
-                            primary={student.name}
-                            secondary={student.email}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Box sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography color="text.secondary">
-                        No results found
-                      </Typography>
-                    </Box>
-                  )}
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Selected Members
-                </Typography>
-                
-                <Paper variant="outlined" sx={{ maxHeight: 300, overflow: 'auto', p: 1 }}>
-                  {selectedMembers.length > 0 ? (
-                    <List>
-                      {selectedMembers.map((student) => (
-                        <ListItem 
-                          key={student._id}
-                          secondaryAction={
-                            <IconButton 
-                              edge="end" 
-                              onClick={() => handleRemoveSelectedMember(student._id)}
-                              title="Remove"
-                              color="error"
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          }
-                        >
-                          <ListItemAvatar>
-                            <Avatar src={getGithubAvatarUrl(student.githubId)} />
-                          </ListItemAvatar>
-                          <ListItemText 
-                            primary={student.name}
-                            secondary={student.email}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Box sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography color="text.secondary">
-                        No members selected
-                      </Typography>
-                    </Box>
-                  )}
-                </Paper>
-              </Grid>
-            </Grid>
-            
-            <Divider sx={{ my: 3 }} />
-            
-            <Typography variant="h6" gutterBottom>
-              Current Team Members
-            </Typography>
-            
-            <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-              {teamData.members.length > 0 ? (
-                <List>
-                  {teamData.members.map((member) => (
-                    <ListItem key={member.userId._id}>
-                      <ListItemAvatar>
-                        <Avatar src={getGithubAvatarUrl(member.userId.githubId)} />
-                      </ListItemAvatar>
-                      <ListItemText 
-                        primary={
-                          <>
-                            {member.userId.name}
-                            {member.role === 'leader' && (
-                              <Chip 
-                                label="Leader" 
-                                size="small" 
-                                color="primary" 
-                                sx={{ ml: 1 }}
-                              />
-                            )}
-                          </>
-                        }
-                        secondary={member.userId.email}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              ) : (
-                <Typography color="text.secondary" align="center">
-                  No team members yet
-                </Typography>
-              )}
-            </Paper>
-            
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
-              <Button 
-                variant="outlined" 
-                onClick={() => setActiveStep(0)}
-              >
-                Back to Repository
-              </Button>
-              
-              <Box>
-                <Button 
-                  variant="contained" 
-                  color="primary"
-                  onClick={handleSubmitMembers}
-                  sx={{ mr: 2 }}
-                  disabled={selectedMembers.length === 0}
-                >
-                  Add Selected Members
-                </Button>
-                
-                <Button 
-                  variant="contained" 
-                  color="success"
-                  onClick={handleFinish}
-                >
-                  Finish Setup
-                </Button>
-              </Box>
-            </Box>
-          </Box>
+          <Alert severity="success" sx={{ mt: 2 }}>
+            {actionSuccess}
+          </Alert>
         )}
       </Paper>
     </Container>
