@@ -5,10 +5,10 @@ import App from './App'
 import './index.css'
 import { AuthProvider } from './contexts/AuthContext'
 
-// 添加错误边界
+// Add error boundary
 const root = ReactDOM.createRoot(document.getElementById('root')!)
 
-// 添加错误处理
+// Add error handling
 window.addEventListener('error', (e) => {
   console.error('Global error:', e)
 })

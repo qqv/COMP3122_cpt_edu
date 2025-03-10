@@ -3,7 +3,7 @@ import { differenceInDays } from 'date-fns'
 export const isTeamActive = (lastActive: string): boolean => {
   const lastActiveDate = new Date(lastActive)
   const daysSinceLastActive = differenceInDays(new Date(), lastActiveDate)
-  return daysSinceLastActive <= 7 // 7天内有活动就算活跃
+  return daysSinceLastActive <= 7 // Team is active if last active within 7 days
 }
 
 export const getActivityStatus = (lastActive: string) => {
@@ -12,12 +12,12 @@ export const getActivityStatus = (lastActive: string) => {
   const diffDays = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24))
 
   if (diffDays <= 7) {
-    return { color: '#4CAF50', label: 'Active', value: 100 }      // 绿色
+    return { color: '#4CAF50', label: 'Active', value: 100 }      // Green
   } else if (diffDays <= 14) {
-    return { color: '#2196F3', label: 'Recent', value: 75 }       // 蓝色
+    return { color: '#2196F3', label: 'Recent', value: 75 }       // Blue
   } else if (diffDays <= 30) {
-    return { color: '#FF9800', label: 'Idle', value: 50 }         // 橙色
+    return { color: '#FF9800', label: 'Idle', value: 50 }         // Orange
   } else {
-    return { color: '#F44336', label: 'Inactive', value: 25 }     // 红色
+    return { color: '#F44336', label: 'Inactive', value: 25 }     // Red
   }
 } 

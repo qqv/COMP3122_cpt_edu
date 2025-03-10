@@ -44,7 +44,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { AlertColor } from '@mui/material/Alert';
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
-// 添加类型定义
+// Define course type
 interface Course {
   _id: string;
   name: string;
@@ -89,11 +89,11 @@ export default function Users() {
     message: '',
     severity: 'success'
   });
-  // 添加搜索状态
+  // Add search state
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
 
-  // 检查用户是否有权限访问此页面
+  // Check if user has permission to access this page
   if (user?.role !== 'lecturer') {
     return (
       <Container maxWidth="md" sx={{ mt: 4 }}>
@@ -120,7 +120,7 @@ export default function Users() {
     );
   }
 
-  // 获取用户和课程数据
+  // Get user and course data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -143,7 +143,7 @@ export default function Users() {
     fetchData();
   }, []);
 
-  // 添加搜索处理函数
+  // Add search processing function
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     const query = event.target.value;
     setSearchQuery(query);
@@ -162,7 +162,7 @@ export default function Users() {
     setFilteredUsers(filtered);
   };
 
-  // 处理表单输入变化
+  // Handle form input change
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({
@@ -171,7 +171,7 @@ export default function Users() {
     });
   };
 
-  // 处理多选课程变化
+  // Handle multiple course change
   const handleCourseChange = (e) => {
     setFormData({
       ...formData,
@@ -179,7 +179,7 @@ export default function Users() {
     });
   };
 
-  // 处理活动状态变化
+  // Handle active status change
   const handleActiveChange = (e) => {
     setFormData({
       ...formData,
@@ -187,7 +187,7 @@ export default function Users() {
     });
   };
 
-  // 打开创建用户对话框
+  // Open create user dialog
   const handleOpenCreateDialog = () => {
     setFormData({
       name: '',
@@ -200,7 +200,7 @@ export default function Users() {
     setCreateDialogOpen(true);
   };
 
-  // 打开编辑用户对话框
+  // Open edit user dialog
   const handleOpenEditDialog = (user) => {
     setCurrentUser(user);
     setFormData({
@@ -214,7 +214,7 @@ export default function Users() {
     setEditDialogOpen(true);
   };
 
-  // 打开课程分配对话框
+  // Open course assignment dialog
   const handleOpenCourseDialog = (user) => {
     setCurrentUser(user);
     setFormData({
@@ -224,20 +224,20 @@ export default function Users() {
     setCourseDialogOpen(true);
   };
 
-  // 打开密码重置对话框
+  // Open password reset dialog
   const handleOpenResetPasswordDialog = (user) => {
     setCurrentUser(user);
     setNewPassword('');
     setResetPasswordDialogOpen(true);
   };
 
-  // 创建新用户
+  // Create new user
   const handleCreateUser = async () => {
     try {
       await userService.createUser(formData);
       setCreateDialogOpen(false);
       
-      // 刷新用户列表
+      // Refresh user list
       const usersData = await userService.getAllUsers();
       setUsers(usersData);
       
@@ -255,7 +255,7 @@ export default function Users() {
     }
   };
 
-  // 更新用户
+  // Update user
   const handleUpdateUser = async () => {
     try {
       if (!currentUser) return;
@@ -263,7 +263,7 @@ export default function Users() {
       await userService.updateUser(currentUser._id, formData);
       setEditDialogOpen(false);
       
-      // 刷新用户列表
+      // Refresh user list
       const usersData = await userService.getAllUsers();
       setUsers(usersData);
       
@@ -281,7 +281,7 @@ export default function Users() {
     }
   };
 
-  // 分配课程
+  // Assign courses
   const handleAssignCourses = async () => {
     try {
       if (!currentUser) return;
@@ -289,7 +289,7 @@ export default function Users() {
       await userService.assignCourses(currentUser._id, formData.courses);
       setCourseDialogOpen(false);
       
-      // 刷新用户列表
+      // Refresh user list
       const usersData = await userService.getAllUsers();
       setUsers(usersData);
       
@@ -307,7 +307,7 @@ export default function Users() {
     }
   };
 
-  // 重置密码
+  // Reset password
   const handleResetPassword = async () => {
     try {
       if (!currentUser) return;
@@ -338,7 +338,7 @@ export default function Users() {
     }
   };
 
-  // 关闭提示框
+  // Close snackbar
   const handleCloseSnackbar = () => {
     setSnackbar({
       ...snackbar,
@@ -504,7 +504,7 @@ export default function Users() {
               </Table>
             </TableContainer>
 
-            {/* 创建用户对话框 */}
+            {/* Create user dialog */}
             <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="sm" fullWidth>
               <DialogTitle>Create New User</DialogTitle>
               <DialogContent>
@@ -585,7 +585,7 @@ export default function Users() {
               </DialogActions>
             </Dialog>
 
-            {/* 编辑用户对话框 */}
+            {/* Edit user dialog */}
             <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
               <DialogTitle>Edit User</DialogTitle>
               <DialogContent>
@@ -630,7 +630,7 @@ export default function Users() {
               </DialogActions>
             </Dialog>
 
-            {/* 分配课程对话框 */}
+            {/* Assign courses dialog */}
             <Dialog open={courseDialogOpen} onClose={() => setCourseDialogOpen(false)} maxWidth="sm" fullWidth>
               <DialogTitle>Assign Courses</DialogTitle>
               <DialogContent>
@@ -674,7 +674,7 @@ export default function Users() {
               </DialogActions>
             </Dialog>
 
-            {/* 重置密码对话框 */}
+            {/* Reset password dialog */}
             <Dialog open={resetPasswordDialogOpen} onClose={() => setResetPasswordDialogOpen(false)} maxWidth="sm" fullWidth>
               <DialogTitle>Reset Password</DialogTitle>
               <DialogContent>
@@ -702,7 +702,7 @@ export default function Users() {
               </DialogActions>
             </Dialog>
 
-            {/* 提示框 */}
+            {/* Snackbar */}
             <Snackbar
               open={snackbar.open}
               autoHideDuration={6000}

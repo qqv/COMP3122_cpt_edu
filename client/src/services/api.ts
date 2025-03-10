@@ -37,7 +37,7 @@ export const teamService = {
         }),
         api.get(`/teams/${id}/stats`).catch(error => {
           console.error('Error fetching team stats:', error);
-          return { data: {} }; // 返回空对象而不是抛出错误
+          return { data: {} }; // 
         })
       ]);
       
@@ -213,8 +213,8 @@ export const studentService = {
   searchStudents: async (query: string) => {
     try {
       const { data } = await api.post('/students/search', { query });
-      console.log('API response data:', data); // 调试日志
-      return data; // 应该返回 { students: [...] }
+      console.log('API response data:', data);
+      return data; 
     } catch (error: any) {
       console.error('Search students error:', error.response || error);
       throw new Error(error.response?.data?.message || 'Failed to search students');
