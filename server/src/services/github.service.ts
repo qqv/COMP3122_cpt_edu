@@ -367,6 +367,54 @@ export const GitHubService = {
       console.error('Error fetching recent commits:', error);
       return [];
     }
+  },
+
+  /**
+   * 获取仓库的 Pull Requests
+   */
+  async getRepositoryPullRequests(owner: string, repo: string, state: "all" | "open" | "closed" = "all"): Promise<any[]> {
+    return withRetry(async () => {
+      const response = await octokit.pulls.list({
+        owner,
+        repo,
+        state,
+        per_page: 100
+      })
+      
+      return response.data
+    })
+  },
+
+  /**
+   * 获取仓库的 Issues
+   */
+  async getRepositoryIssues(owner: string, repo: string, state: "all" | "open" | "closed" = "all"): Promise<any[]> {
+    return withRetry(async () => {
+      const response = await octokit.issues.listForRepo({
+        owner,
+        repo,
+        state,
+        per_page: 100
+      })
+      
+      // 过滤掉 Pull Requests (GitHub API 中 Issues 包含 PRs)
+      return response.data.filter(issue => !issue.pull_request)
+    })
+  },
+
+  /**
+   * 获取仓库的提交历史
+   */
+  async getRepositoryCommits(owner: string, repo: string, limit = 100): Promise<any[]> {
+    return withRetry(async () => {
+      const response = await octokit.repos.listCommits({
+        owner,
+        repo,
+        per_page: limit
+      });
+      
+      return response.data;
+    });
   }
 }
 

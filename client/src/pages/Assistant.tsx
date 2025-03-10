@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Box,
   Container,
@@ -22,7 +22,11 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material'
 import {
   Analytics as AnalyticsIcon,
@@ -35,9 +39,14 @@ import {
   BugReport as BugReportIcon,
   Insights as InsightsIcon,
   AutoGraph as AutoGraphIcon,
-  Psychology as PsychologyIcon
+  Psychology as PsychologyIcon,
+  Send as SendIcon,
+  Refresh as RefreshIcon,
+  Groups as GroupsIcon
 } from '@mui/icons-material'
 import Sidebar from '../components/Sidebar'
+import { api } from '../services/api'
+import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../contexts/AuthContext'
 
 // Define AI assistant feature type
@@ -49,6 +58,23 @@ interface AssistantFeature {
   action: () => void;
 }
 
+// 定义消息类型
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+// 添加类型定义
+interface Course {
+  _id: string;
+  name: string;
+}
+
+interface Team {
+  _id: string;
+  name: string;
+}
+
 export default function Assistant() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -57,6 +83,16 @@ export default function Assistant() {
   const [activeFeature, setActiveFeature] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
+  const [input, setInput] = useState('')
+  const [messages, setMessages] = useState<Message[]>([])
+  const [courses, setCourses] = useState<Course[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  
+  // 课程选择弹窗状态
+  const [openCourseDialog, setOpenCourseDialog] = useState(false)
+  const [selectedCourse, setSelectedCourse] = useState('')
+  const [selectedTeam, setSelectedTeam] = useState('')
+  const [analysisType, setAnalysisType] = useState('collaboration') // collaboration, code, progress
 
   // Handle AI request
   const handleAIRequest = async (prompt: string, context?: any) => {
@@ -113,8 +149,8 @@ export default function Assistant() {
       description: 'Analyze team dynamics and identify potential collaboration issues',
       icon: <GroupIcon fontSize="large" color="primary" />,
       action: () => {
-        setActiveFeature('team-collaboration')
-        handleAIRequest('Analyze team collaboration patterns and dynamics')
+        // 打开团队选择弹窗
+        handleOpenTeamCollaboration();
       }
     },
     {
@@ -156,6 +192,121 @@ export default function Assistant() {
     setActiveFeature('custom-query')
     handleAIRequest(customPrompt)
     setCustomPrompt('')
+  }
+
+  // 获取课程列表
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const { data } = await api.get('/courses')
+        setCourses(data)
+      } catch (error) {
+        console.error('Failed to fetch courses:', error)
+      }
+    }
+    
+    fetchCourses()
+  }, [])
+  
+  // 处理课程选择
+  const handleCourseChange = async (courseId) => {
+    setSelectedCourse(courseId)
+    
+    try {
+      const { data } = await api.get(`/courses/${courseId}`)
+      if (data.teamsList) {
+        setTeams(data.teamsList)
+      }
+    } catch (error) {
+      console.error('Failed to fetch teams for course:', error)
+    }
+  }
+  
+  // 打开团队协作分析弹窗
+  const handleOpenTeamCollaboration = () => {
+    setAnalysisType('collaboration');
+    setOpenCourseDialog(true);
+    
+    // 如果还没有加载课程，则加载
+    if (courses.length === 0) {
+      const fetchCourses = async () => {
+        try {
+          const { data } = await api.get('/courses');
+          setCourses(data);
+        } catch (error) {
+          console.error('Failed to fetch courses:', error);
+        }
+      };
+      fetchCourses();
+    }
+  }
+  
+  // 关闭弹窗
+  const handleCloseDialog = () => {
+    setOpenCourseDialog(false)
+    setSelectedTeam('')
+  }
+  
+  // 生成团队协作分析
+  const handleGenerateAnalysis = async () => {
+    if (!selectedTeam) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      setActiveFeature('team-collaboration');
+      
+      // 添加 mock=true 参数用于测试
+      const { data } = await api.post('/ai/analyze-team', {
+        teamId: selectedTeam,
+        analysisType: analysisType
+      });
+      
+      console.log('Analysis response:', data);
+      
+      // 设置结果，确保包含正确的格式
+      setResult({
+        content: data.analysis,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 关闭对话框
+      handleCloseDialog();
+    } catch (error) {
+      console.error('Failed to generate analysis:', error);
+      setError('Failed to generate team analysis. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // 发送普通消息
+  const handleSendMessage = async () => {
+    if (!input.trim() || loading) return
+    
+    const userMessage: Message = { role: 'user', content: input }
+    setMessages(prev => [...prev, userMessage])
+    setInput('')
+    setLoading(true)
+    
+    try {
+      const { data } = await api.post('/ai/chat', {
+        messages: [...messages, userMessage]
+      })
+      
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.response
+      }])
+    } catch (error) {
+      console.error('Failed to get AI response:', error)
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error. Please try again later.'
+      }])
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -232,9 +383,11 @@ export default function Assistant() {
                     Analysis Results
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  <Typography variant="body1" paragraph>
-                    {result.content}
-                  </Typography>
+                  <Paper sx={{ p: 2, maxHeight: '60vh', overflow: 'auto' }}>
+                    <ReactMarkdown>
+                      {result.content}
+                    </ReactMarkdown>
+                  </Paper>
                   <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
                     <Typography variant="caption" color="text.secondary">
                       Generated at: {new Date(result.timestamp).toLocaleString()}
@@ -273,6 +426,54 @@ export default function Assistant() {
             disabled={!customPrompt.trim()}
           >
             Submit Query
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Course Selection Dialog */}
+      <Dialog open={openCourseDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Select Course and Team</DialogTitle>
+        <DialogContent>
+          <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
+            <InputLabel>Course</InputLabel>
+            <Select
+              value={selectedCourse}
+              label="Course"
+              onChange={(e) => handleCourseChange(e.target.value)}
+            >
+              {courses.map((course) => (
+                <MenuItem key={course._id} value={course._id}>
+                  {course.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          {selectedCourse && (
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Team</InputLabel>
+              <Select
+                value={selectedTeam}
+                label="Team"
+                onChange={(e) => setSelectedTeam(e.target.value)}
+              >
+                {teams.map((team) => (
+                  <MenuItem key={team._id} value={team._id}>
+                    {team.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button 
+            onClick={handleGenerateAnalysis} 
+            variant="contained" 
+            disabled={!selectedTeam}
+          >
+            Generate Analysis
           </Button>
         </DialogActions>
       </Dialog>
