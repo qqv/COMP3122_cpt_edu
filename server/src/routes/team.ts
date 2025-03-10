@@ -13,16 +13,16 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const teams = await Team.find().populate('course').lean()
 
-    // 获取所有学生ID
+    // Get all student IDs
     const studentIds = teams.flatMap(team => 
       team.members.map(member => member.userId.toString())
     )
 
-    // 批量获取学生信息
+    // Get student information in bulk
     const students = await Student.find({ _id: { $in: studentIds } }).lean()
     const studentMap = new Map(students.map(student => [student._id.toString(), student]))
 
-    // 批量获取GitHub统计数据
+    // Get GitHub stats in bulk
     const teamsWithStats = await Promise.all(
       teams.map(async (team) => {
         try {
@@ -32,7 +32,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           
           const stats = await GitHubService.getRepoStats(owner, repo)
           
-          // 添加学生信息
+          // Add student information
           const membersWithDetails = team.members.map(member => ({
             ...member,
             user: studentMap.get(member.userId.toString())
@@ -97,15 +97,15 @@ router.get('/:id/stats', async (req: Request, res: Response, next: NextFunction)
     }
     
     try {
-      // 尝试从 GitHub 获取真实数据
+      // Try to get real data from GitHub
       const [owner, repo] = team.repositoryUrl
         .replace('https://github.com/', '')
         .split('/');
       
-      // 获取贡献者数据
+      // Get contributors data
       const contributors = await GitHubService.getRepoContributors(owner, repo);
       
-      // 将 GitHub 贡献者数据与团队成员匹配
+      // Match GitHub contributors data with team members
       const memberStats = team.members.map(member => {
         const user = (member.userId as any);
         const contribution = contributors.find(c => 
@@ -125,16 +125,16 @@ router.get('/:id/stats', async (req: Request, res: Response, next: NextFunction)
         };
       });
       
-      // 获取提交活动数据
+      // Get commit activity data
       const commitActivity = await GitHubService.getCommitActivity(owner, repo);
       
-      // 获取仓库统计数据
+      // Get repository stats
       const repoStats = await GitHubService.getRepoStats(owner, repo);
       
-      // 获取最近的提交记录
+      // Get recent commits
       const recentCommits = await GitHubService.getRecentCommits(owner, repo, 10);
       
-      // 返回完整数据
+      // Return full data
       const stats = {
         teamId: team._id,
         name: team.name,
@@ -158,8 +158,8 @@ router.get('/:id/stats', async (req: Request, res: Response, next: NextFunction)
       console.error("Error fetching GitHub data:", githubError);
       console.log("Falling back to mock data");
       
-      // 如果 GitHub API 调用失败，回退到模拟数据
-      // (保留现有的模拟数据代码)
+      // If GitHub API call fails, fall back to mock data
+      // (keep existing mock data code)
       const mockMemberStats = team.members.map(member => {
         const userId = (member.userId as any);
         return {
@@ -175,7 +175,7 @@ router.get('/:id/stats', async (req: Request, res: Response, next: NextFunction)
         };
       });
       
-      // 模拟提交活动数据
+      // Mock commit activity data
       const today = new Date();
       const mockCommitActivity = Array.from({ length: 14 }, (_, i) => {
         const date = new Date(today);
@@ -186,7 +186,7 @@ router.get('/:id/stats', async (req: Request, res: Response, next: NextFunction)
         };
       });
       
-      // 获取最近的提交记录
+      // Get recent commits
       const mockRecentCommits = Array.from({ length: 10 }, (_, i) => ({
         id: `mock-commit-${i + 1}`,
         message: `Mock commit message ${i + 1}`,
@@ -200,7 +200,7 @@ router.get('/:id/stats', async (req: Request, res: Response, next: NextFunction)
         url: `https://github.com/mock-repo/commit/${i + 1}`
       }));
       
-      // 获取统计数据
+      // Get stats
       const stats = {
         teamId: team._id,
         name: team.name,
@@ -235,24 +235,24 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       return next(new AppError('Name, leader email and course ID are required', 400));
     }
     
-    // 查找或创建学生
+    // Find or create student
     let student = await Student.findOne({ email: leaderEmail });
     
     if (!student) {
-      // 如果学生不存在，创建一个新学生
+      // If student does not exist, create a new student
       student = new Student({
-        name: leaderEmail.split('@')[0], // 使用邮箱前缀作为临时名称
+        name: leaderEmail.split('@')[0], // Use email prefix as temporary name
         email: leaderEmail,
-        // 其他字段可以在学生首次登录时更新
+        // Other fields can be updated when the student first logs in
       });
       
       await student.save();
     }
     
-    // 生成唯一的邀请码
+    // Generate a unique invite code
     const inviteCode = crypto.randomBytes(16).toString('hex');
     
-    // 创建团队
+    // Create team
     const team = new Team({
       name,
       course: courseId,
@@ -261,12 +261,12 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         role: 'leader'
       }],
       inviteCode,
-      repositoryUrl: '' // 初始为空，由团队领导提交
+      repositoryUrl: '' // Initial empty, leader will submit
     });
     
     await team.save();
     
-    // 生成邀请链接
+    // Generate invite link
     const inviteLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/teams/invite/${inviteCode}`;
     
     res.status(201).json({
@@ -295,27 +295,27 @@ router.post('/batch', async (req: Request, res: Response, next: NextFunction) =>
       const { name, leaderEmail } = teamData;
       
       if (!name || !leaderEmail) {
-        continue; // 跳过无效的团队数据
+        continue; // Skip invalid team data
       }
       
-      // 查找或创建学生
+      // Find or create student
       let student = await Student.findOne({ email: leaderEmail });
       
       if (!student) {
-        // 如果学生不存在，创建一个新学生
+        // If student does not exist, create a new student
         student = new Student({
-          name: leaderEmail.split('@')[0], // 使用邮箱前缀作为临时名称
+          name: leaderEmail.split('@')[0], // Use email prefix as temporary name
           email: leaderEmail,
-          // 其他字段可以在学生首次登录时更新
+          // Other fields can be updated when the student first logs in
         });
         
         await student.save();
       }
       
-      // 生成唯一的邀请码
+      // Generate a unique invite code
       const inviteCode = crypto.randomBytes(16).toString('hex');
       
-      // 创建团队
+      // Create team
       const team = new Team({
         name,
         course: courseId,
@@ -324,12 +324,12 @@ router.post('/batch', async (req: Request, res: Response, next: NextFunction) =>
           role: 'leader'
         }],
         inviteCode,
-        repositoryUrl: '' // 初始为空，由团队领导提交
+        repositoryUrl: '' // Initial empty, leader will submit
       });
       
       await team.save();
       
-      // 生成邀请链接
+      // Generate invite link
       const inviteLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/teams/invite/${inviteCode}`;
       
       results.push({
@@ -363,7 +363,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
   try {
     const teamId = req.params.id;
     
-    // 查找并删除团队
+    // Find and delete team
     const team = await Team.findByIdAndDelete(teamId);
     
     if (!team) {
@@ -395,19 +395,19 @@ router.get('/name/:name', async (req: Request, res: Response, next: NextFunction
   }
 })
 
-// 修改路由路径
+// Get available students
 router.get('/api/students/available', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 获取所有学生
+    // Get all students
     const students = await Student.find().lean();
     
-    // 获取所有团队成员的学生ID
+    // Get all team member student IDs
     const teams = await Team.find().lean();
     const teamMemberIds = new Set(
       teams.flatMap(team => team.members.map(member => member.userId.toString()))
     );
     
-    // 过滤出未分配到团队的学生
+    // Filter out students not assigned to a team
     const availableStudents = students.filter(student => 
       !teamMemberIds.has(student._id.toString())
     );
@@ -418,7 +418,7 @@ router.get('/api/students/available', async (req: Request, res: Response, next: 
   }
 });
 
-// 添加团队成员的路由
+// Add team member route
 router.post('/:id/members', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { studentId } = req.body;
@@ -427,14 +427,14 @@ router.post('/:id/members', async (req: Request, res: Response, next: NextFuncti
       return next(new AppError('Student ID is required', 400));
     }
     
-    // 查找团队
+    // Find team
     const team = await Team.findById(req.params.id);
     
     if (!team) {
       return next(new AppError('Team not found', 404));
     }
     
-    // 检查学生是否已经是团队成员
+    // Check if student is already a team member
     const isAlreadyMember = team.members.some(
       member => member.userId.toString() === studentId
     );
@@ -443,7 +443,7 @@ router.post('/:id/members', async (req: Request, res: Response, next: NextFuncti
       return next(new AppError('Student is already a team member', 400));
     }
     
-    // 添加新成员
+    // Add new member
     team.members.push({
       userId: studentId,
       role: 'member'

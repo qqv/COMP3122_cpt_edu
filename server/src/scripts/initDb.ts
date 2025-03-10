@@ -3,25 +3,35 @@ import User, { UserRole } from '../models/user'
 import Student from '../models/student'
 import Course from '../models/course'
 import Team from '../models/team'
+import Setting from '../models/setting'
 import { config } from '../config'
 import bcrypt from 'bcrypt'
-import course from '../models/course'
 
 const initializeDb = async () => {
   try {
     await mongoose.connect(config.mongodb.uri)
     console.log('Connected to MongoDB')
 
-    // 清除所有相关集合的数据
+    // Clear all related collections data
     await Promise.all([
       User.deleteMany({}),
       Course.deleteMany({}),
       Student.deleteMany({}),
-      Team.deleteMany({})
+      Team.deleteMany({}),
+      Setting.deleteMany({})
     ])
     console.log('Cleared existing data')
 
-    // 创建用户
+    // Create default settings
+    await Setting.create({
+      tokenExpiry: 24,
+      aiEndpoint: 'https://api.openai.com/v1',
+      aiToken: '', // Default empty, user needs to set
+      aiModel: 'gpt-4'
+    })
+    console.log('Created default settings')
+
+    // Create users
     const users = await User.create([
       {
         name: 'Dr. Wong, Jane',
@@ -43,7 +53,7 @@ const initializeDb = async () => {
       }
     ])
 
-    // 创建学生
+    // Create students
     const students = await Student.insertMany([
       {
         name: 'Master, Fake',
@@ -77,7 +87,7 @@ const initializeDb = async () => {
       }
     ])
 
-    // 创建课程并分配教师
+    // Create courses and assign teachers
     const courses = await Course.create([
       {
         name: 'COMP3421 - Software Engineering',
@@ -99,7 +109,7 @@ const initializeDb = async () => {
       }
     ])
 
-    // 创建团队
+    // Create teams
     await Team.insertMany([
       {
         name: 'Team Alpha',

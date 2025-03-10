@@ -1,23 +1,56 @@
 import { Router } from 'express'
 import Course from '../models/course'
+import Team from '../models/team'
 import { authMiddleware, roleMiddleware } from '../middleware/auth'
 import { UserRole } from '../models/user'
 import { AppError } from '../middleware/error'
 import type { Request, Response, NextFunction } from 'express'
+import mongoose from 'mongoose'
 
 const router = Router()
 
-// 获取所有课程
+// Get all courses
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Get all courses
     const courses = await Course.find().populate('teachers', 'name email role').lean()
-    res.status(200).json(courses)
+    
+    // Get all teams
+    const teams = await Team.find().lean()
+    
+    // Calculate the number of teams and students for each course
+    const coursesWithStats = await Promise.all(courses.map(async (course) => {
+      // Find all teams that belong to this course
+      const courseTeams = teams.filter(team => 
+        team.course && team.course.toString() === course._id.toString()
+      )
+      
+      // Calculate the number of teams
+      const teamsCount = courseTeams.length
+      
+      // Calculate the number of students (unique)
+      const uniqueStudentIds = new Set()
+      courseTeams.forEach(team => {
+        team.members.forEach(member => {
+          uniqueStudentIds.add(member.userId.toString())
+        })
+      })
+      
+      return {
+        ...course,
+        teams: teamsCount,
+        students: uniqueStudentIds.size
+      }
+    }))
+    
+    res.status(200).json(coursesWithStats)
   } catch (error) {
+    console.error('Error fetching courses:', error)
     next(new AppError('Failed to fetch courses', 500))
   }
 })
 
-// 获取单个课程
+// Get a single course
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const course = await Course.findById(req.params.id).populate('teachers', 'name email role')
@@ -26,13 +59,31 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       return next(new AppError('Course not found', 404))
     }
     
-    res.status(200).json(course)
+    // Get all teams that belong to this course
+    const teams = await Team.find({ course: course._id }).lean()
+    
+    // Calculate the number of students (unique)
+    const uniqueStudentIds = new Set()
+    teams.forEach(team => {
+      team.members.forEach(member => {
+        uniqueStudentIds.add(member.userId.toString())
+      })
+    })
+    
+    const courseWithStats = {
+      ...course.toObject(),
+      teams: teams.length,
+      students: uniqueStudentIds.size,
+      teamsList: teams
+    }
+    
+    res.status(200).json(courseWithStats)
   } catch (error) {
     next(new AppError('Failed to fetch course', 500))
   }
 })
 
-// 创建课程 (仅限讲师)
+// Create a course (only for lecturers)
 router.post('/', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, code, description, startDate, endDate } = req.body;
@@ -41,7 +92,7 @@ router.post('/', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req
       return next(new AppError('Course name, code, start date and end date are required', 400));
     }
     
-    // 检查课程代码是否已存在
+    // Check if the course code already exists
     const existingCourse = await Course.findOne({ code });
     if (existingCourse) {
       return next(new AppError('Course code already exists', 400));
@@ -65,12 +116,12 @@ router.post('/', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req
   }
 });
 
-// 更新课程 (仅限讲师)
+// Update a course (only for lecturers)
 router.put('/:id', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, code, description, teachers } = req.body
     
-    // 如果更新了课程代码，检查是否与其他课程冲突
+    // If the course code is updated, check if it conflicts with another course
     if (code) {
       const existingCourse = await Course.findOne({ code, _id: { $ne: req.params.id } })
       if (existingCourse) {
@@ -97,7 +148,7 @@ router.put('/:id', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (r
   }
 })
 
-// 删除课程 (仅限讲师)
+// Delete a course (only for lecturers)
 router.delete('/:id', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const course = await Course.findByIdAndDelete(req.params.id)
@@ -114,7 +165,7 @@ router.delete('/:id', authMiddleware, roleMiddleware([UserRole.LECTURER]), async
   }
 })
 
-// 分配教师到课程 (仅限讲师)
+// Assign teachers to a course (only for lecturers)
 router.post('/:id/assign-teachers', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { teachers } = req.body

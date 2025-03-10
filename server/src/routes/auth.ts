@@ -6,47 +6,47 @@ import type { Request, Response, NextFunction } from 'express'
 
 const router = Router()
 
-// 登录路由
+// Login route
 router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body
-    
-    // 验证请求体
+
+    // Validate request body
     if (!email || !password) {
       return next(new AppError('Email and password are required', 400))
     }
     
-    // 查找用户
+    // Find user
     const user = await User.findOne({ email }).select('+password')
     
     if (!user || !(await user.comparePassword(password))) {
       return next(new AppError('Invalid email or password', 401))
     }
     
-    // 检查用户是否激活
+    // Check if user is active
     if (!user.active) {
       return next(new AppError('Your account is inactive. Please contact administrator.', 403))
     }
     
-    // 生成 JWT
+    // Generate JWT
     const token = jwt.sign(
       { id: user._id },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '1d' }
     )
     
-    // 更新最后登录时间
+    // Update last login time
     user.lastLogin = new Date()
     await user.save({ validateBeforeSave: false })
     
-    // 设置 cookie
+    // Set cookie
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 24 * 60 * 60 * 1000 // 1天
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
     })
     
-    // 发送响应
+    // Send response
     res.status(200).json({
       status: 'success',
       token,
@@ -62,7 +62,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
   }
 })
 
-// 登出路由
+// Logout route
 router.post('/logout', (req: Request, res: Response) => {
   res.cookie('token', 'loggedout', {
     expires: new Date(Date.now() + 10 * 1000),
@@ -71,20 +71,20 @@ router.post('/logout', (req: Request, res: Response) => {
   res.status(200).json({ status: 'success' })
 })
 
-// 获取当前用户信息
+// Get current user information
 router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 从 cookie 或 Authorization 头获取令牌
+    // Get token from cookie or Authorization header
     const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(' ')[1])
     
     if (!token) {
       return next(new AppError('Not logged in', 401))
     }
     
-    // 验证令牌
+    // Verify token
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key')
     
-    // 查找用户
+    // Find user
     const user = await User.findById(decoded.id).select('-password')
     
     if (!user || !user.active) {

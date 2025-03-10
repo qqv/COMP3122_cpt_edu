@@ -64,7 +64,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 })
 
-// 搜索学生
+// Search students  
 router.post('/search', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { query } = req.body
