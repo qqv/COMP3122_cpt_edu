@@ -1,4 +1,4 @@
-// 禁用 punycode 警告
+// Block warnings for punycode
 process.removeAllListeners('warning')
 process.on('warning', (warning) => {
   if (warning.name === 'DeprecationWarning' && 

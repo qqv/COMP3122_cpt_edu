@@ -40,7 +40,7 @@ import {
 import Sidebar from '../components/Sidebar'
 import { useAuth } from '../contexts/AuthContext'
 
-// 定义AI助手功能类型
+// Define AI assistant feature type
 interface AssistantFeature {
   id: string;
   title: string;
@@ -58,7 +58,7 @@ export default function Assistant() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
 
-  // 处理AI请求
+  // Handle AI request
   const handleAIRequest = async (prompt: string, context?: any) => {
     setLoading(true)
     setError(null)

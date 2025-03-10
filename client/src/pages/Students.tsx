@@ -85,7 +85,7 @@ const students = [
     avatar: '/avatars/jessica.jpg',
     stats: { commits: 31, issues: 14, pullRequests: 7, comments: 28, activity: 'high', lastActive: '1 hour ago' }
   },
-  // ... 添加更多学生数据直到15个
+  // ... 
 ]
 
 const getActivityIcon = (activity: string) => {

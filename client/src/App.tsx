@@ -9,6 +9,7 @@ import TeamDetail from './pages/TeamDetail'
 import TeamInvite from './pages/TeamInvite'
 
 import Students from './pages/Students'
+import Courses from './pages/Courses'
 import Settings from './pages/Settings'
 import Analytics from './pages/Analytics'
 // import Reports from './pages/Reports'
@@ -42,6 +43,7 @@ function App() {
             <Route path="/team/:id" element={<TeamDetail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/students" element={<Students />} />
+            <Route path="/courses" element={<Courses />} />
             <Route path="/analytics" element={<Analytics />} />
             {/* <Route path="/reports" element={<Reports />} /> */}
             <Route path="/assistant" element={<Assistant />} />

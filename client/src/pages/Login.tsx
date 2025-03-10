@@ -33,7 +33,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // 如果已经登录，重定向到仪表板
+  // If already logged in, redirect to dashboard
   React.useEffect(() => {
     if (isAuthenticated) {
       navigate('/dashboard')

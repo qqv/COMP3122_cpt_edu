@@ -330,7 +330,7 @@ export default function Analytics() {
                 <Card>
                   <CardHeader title="Deadline Fighters" />
                   <CardContent>
-                    {/* 这里将添加截止日期冲刺者列表 */}
+                    {/* This section will be added later */}
                   </CardContent>
                 </Card>
               </Grid>

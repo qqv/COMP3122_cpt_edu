@@ -68,14 +68,14 @@ const getActivityColor = (index: number) => {
   return colors[index % colors.length]
 }
 
-// 添加类型定义
+// Add type definition
 interface TeamLink {
   teamName: string;
   leaderEmail: string;
   inviteLink: string;
 }
 
-// 添加课程类型定义
+// Add course type definition
 interface Course {
   _id: string;
   name: string;
@@ -107,12 +107,12 @@ export default function Teams() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTeams, setFilteredTeams] = useState<any[]>([]);
 
-  // 将 fetchTeams 提取为独立函数
+  // Extract fetchTeams as a separate function
   const fetchTeams = async () => {
     try {
       const data = await teamService.getTeams()
       setTeams(data)
-      setFilteredTeams(data) // 初始化过滤后的团队列表
+      setFilteredTeams(data) // Initialize filtered team list
       setError(null)
     } catch (err: any) {
       setError(err.message)
@@ -141,7 +141,7 @@ export default function Teams() {
     fetchCourses();
   }, []);
 
-  // 添加搜索处理函数
+  // Add search processing function
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     const query = event.target.value;
     setSearchQuery(query);
@@ -161,16 +161,16 @@ export default function Teams() {
 
   const sortedTeams = useMemo(() => {
     return [...filteredTeams].sort((a, b) => {
-      // 首先按仓库存在状态排序
+      // Sort by repository existence status first
       if (!a.exists && b.exists) return -1
       if (a.exists && !b.exists) return 1
       
-      // 如果存在状态相同，按最后活动时间排序
+      // If existence status is the same, sort by last activity time
       if (a.exists && b.exists) {
         return new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime()
       }
       
-      // 如果都不存在，按名称排序
+      // If neither exists, sort by name
       return a.name.localeCompare(b.name)
     })
   }, [filteredTeams])
@@ -198,7 +198,7 @@ export default function Teams() {
         courseId
       });
       
-      // 刷新团队列表
+      // Refresh team list
       fetchTeams();
       
       // 显示创建的团队链接
@@ -230,7 +230,7 @@ export default function Teams() {
         return;
       }
       
-      // 解析CSV格式的数据（假设格式为：团队名称,负责人邮箱）
+      // Parse CSV data (assuming format: team name, leader email)
       const teams = batchTeamData
         .split('\n')
         .map(line => line.trim())
@@ -245,13 +245,13 @@ export default function Teams() {
         return;
       }
       
-      // 批量创建团队
+      // Batch create teams
       const results = await teamService.batchCreateTeams(teams, courseId);
       
-      // 刷新团队列表
+      // Refresh team list
       fetchTeams();
       
-      // 显示创建的团队链接
+      // Show created team links
       setCreatedTeamLinks(results);
       setShowCreatedLinks(true);
       setBatchDialogOpen(false);
@@ -270,9 +270,9 @@ export default function Teams() {
       }
       
       const response = await studentService.searchStudents(leaderSearchQuery);
-      console.log('Search response:', response); // 调试日志
+      console.log('Search response:', response); // Debug log
       
-      // 确保我们正确访问返回的数据
+      // Ensure we correctly access the returned data
       if (response && response.students) {
         setLeaderSearchResults(response.students);
       } else {
@@ -308,7 +308,7 @@ export default function Teams() {
       const body = encodeURIComponent(`Please set up your team repository for ${team.name}.`);
       window.location.href = `mailto:${leader.userId.email}?subject=${subject}&body=${body}`;
     } else {
-      // 如果找不到邮箱，显示错误提示
+      // If no email is found, display an error message
       setSnackbar({
         open: true,
         message: 'Could not find team leader email',
@@ -392,7 +392,7 @@ export default function Teams() {
           </Grid>
         </Container>
 
-        {/* 创建单个团队对话框 */}
+        {/* Create a single team dialog */}
         <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)}>
           <DialogTitle>Create New Team</DialogTitle>
           <DialogContent>
@@ -518,7 +518,7 @@ export default function Teams() {
           </DialogActions>
         </Dialog>
 
-        {/* 批量创建团队对话框 */}
+        {/* Batch create team dialog */}
         <Dialog 
           open={batchDialogOpen} 
           onClose={() => setBatchDialogOpen(false)}
@@ -570,7 +570,7 @@ Team C, leader.c@example.com"
           </DialogActions>
         </Dialog>
 
-        {/* 显示创建的团队链接 */}
+        {/* Show created team links */}
         <Dialog 
           open={showCreatedLinks} 
           onClose={() => setShowCreatedLinks(false)}
@@ -604,7 +604,7 @@ Team C, leader.c@example.com"
                       <IconButton 
                         onClick={() => {
                           navigator.clipboard.writeText(team.inviteLink);
-                          // 可以添加复制成功的提示
+                          // Add a copy success prompt
                         }}
                         title="Copy link"
                       >
@@ -621,7 +621,7 @@ Team C, leader.c@example.com"
             <Button 
               variant="contained"
               onClick={() => {
-                // 导出为CSV
+                // Export to CSV
                 const csvContent = "data:text/csv;charset=utf-8," + 
                   "Team Name,Leader Email,Invitation Link\n" +
                   createdTeamLinks.map(team => 

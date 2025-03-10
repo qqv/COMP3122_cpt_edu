@@ -35,31 +35,35 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 // 创建课程 (仅限讲师)
 router.post('/', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, code, description, teachers } = req.body
+    const { name, code, description, startDate, endDate } = req.body;
+    
+    if (!name || !code || !startDate || !endDate) {
+      return next(new AppError('Course name, code, start date and end date are required', 400));
+    }
     
     // 检查课程代码是否已存在
-    const existingCourse = await Course.findOne({ code })
+    const existingCourse = await Course.findOne({ code });
     if (existingCourse) {
-      return next(new AppError('Course code already exists', 400))
+      return next(new AppError('Course code already exists', 400));
     }
     
     const course = new Course({
       name,
       code,
-      description,
-      teachers: teachers || []
-    })
+      description: description || '',
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      createdAt: new Date()
+    });
     
-    await course.save()
+    await course.save();
     
-    res.status(201).json({
-      message: 'Course created successfully',
-      course
-    })
+    res.status(201).json(course);
   } catch (error) {
-    next(new AppError('Failed to create course', 500))
+    console.error('Create course error:', error);
+    next(new AppError('Failed to create course', 500));
   }
-})
+});
 
 // 更新课程 (仅限讲师)
 router.put('/:id', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {

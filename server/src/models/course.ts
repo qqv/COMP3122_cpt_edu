@@ -5,9 +5,10 @@ export interface ICourse extends Document {
   code: string;
   description?: string;
   teachers: mongoose.Types.ObjectId[];
-  startDate: Date;
-  endDate: Date;
+  startDate?: Date;
+  endDate?: Date;
   status: string;
+  createdAt: Date;
 }
 
 const courseSchema = new Schema({
@@ -24,7 +25,7 @@ const courseSchema = new Schema({
   },
   description: {
     type: String,
-    trim: true
+    default: ''
   },
   teachers: [{
     type: mongoose.Schema.Types.ObjectId,
@@ -32,16 +33,20 @@ const courseSchema = new Schema({
   }],
   startDate: {
     type: Date,
-    required: true
+    required: false
   },
   endDate: {
     type: Date,
-    required: true
+    required: false
   },
   status: {
     type: String,
     enum: ['active', 'inactive', 'archived'],
     default: 'active'
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
 }, {
   timestamps: true

@@ -10,8 +10,8 @@ interface IUser {
 }
 
 const userCache = new NodeCache({ 
-  stdTTL: 3600, // 1小时缓存
-  checkperiod: 120 // 每2分钟检查过期
+  stdTTL: 3600, // 1 hour
+  checkperiod: 120 // 2 minutes per check
 })
 
 export const UserService = {

@@ -20,6 +20,7 @@ import {
   School as SchoolIcon,
   Analytics as AnalyticsIcon,
   Assessment as AssessmentIcon,
+  Style as StyleIcon,
   Assistant as AssistantIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
@@ -52,8 +53,9 @@ export default function Sidebar() {
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
   ]
 
-  // 只有讲师才能看到用户管理
+  // Only lecturers can see user management
   if (user?.role === 'lecturer') {
+    menuItems.push({ text: 'Courses', icon: <StyleIcon />, path: '/courses' })
     menuItems.push({ text: 'Users', icon: <PersonIcon />, path: '/users' })
   }
 
@@ -82,7 +84,7 @@ export default function Sidebar() {
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* 用户信息 */}
+        {/* User information */}
         <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', px: 1 }}>
           <Avatar 
             sx={{ width: 40, height: 40, mr: 2, bgcolor: 'primary.main' }}
