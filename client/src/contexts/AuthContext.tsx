@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
 
-// Debug Mode: 可以设置为 false 来使用真实的 API
+// Debug Mode: If true, use debug user instead of real API
 const DEBUG_MODE = false;
 const DEBUG_USER = {
   _id: 'debug123',

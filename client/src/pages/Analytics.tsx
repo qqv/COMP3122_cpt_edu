@@ -20,7 +20,7 @@ import {
   SparkLineChart
 } from '@mui/x-charts'
 
-// 假数据
+// Fake data
 const commitData = {
   xAxis: [{ 
     data: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
