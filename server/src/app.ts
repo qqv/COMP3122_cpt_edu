@@ -19,7 +19,7 @@ import aiRoutes from './routes/ai'
 
 dotenv.config()
 
-// 禁用 punycode 警告
+// Disable punycode warning
 process.removeAllListeners('warning')
 process.on('warning', (warning) => {
   if (warning.name === 'DeprecationWarning' && 
@@ -29,7 +29,7 @@ process.on('warning', (warning) => {
   console.warn(warning)
 })
 
-// 在应用启动时检查必要的环境变量
+// Check necessary environment variables when app starts
 const requiredEnvVars = ['GITHUB_TOKEN', 'MONGODB_URI']
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar])
 
@@ -41,16 +41,16 @@ if (missingEnvVars.length > 0) {
 const app = express()
 
 // Middleware
-// 允许多个源
+// Allow multiple sources
 const allowedOrigins = [
   'http://localhost:3000',
-  'http://localhost:5173',  // Vite 默认端口
+  'http://localhost:5173',  // Vite default port
   'http://localhost:4173'   // Vite preview 
 ]
 
 app.use(cors({
   origin: (origin, callback) => {
-    // 允许没有 origin 的请求（比如开发工具或 Postman）
+    // Allow requests without origin (like development tools or Postman)
     if (!origin) return callback(null, true)
     
     if (allowedOrigins.includes(origin)) {
@@ -69,7 +69,7 @@ app.use(cookieParser())
 
 // Database connection
 mongoose.connect(config.mongodb.uri, {
-  // 不再需要 useNewUrlParser 和 useUnifiedTopology
+  // No need for useNewUrlParser and useUnifiedTopology
 })
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => console.error('MongoDB connection error:', err))

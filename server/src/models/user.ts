@@ -54,11 +54,11 @@ const userSchema = new Schema<IUser>({
   timestamps: true
 })
 
-// 密码哈希中间件
+// Password hashing middleware
 userSchema.pre('save', async function(next) {
   const user = this
   
-  // 只有在密码被修改时才重新哈希
+  // Only rehash if password is modified
   if (!user.isModified('password')) return next()
   
   try {
@@ -70,7 +70,7 @@ userSchema.pre('save', async function(next) {
   }
 })
 
-// 密码比较方法
+// Password comparison method
 userSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
   return bcrypt.compare(candidatePassword, this.password)
 }

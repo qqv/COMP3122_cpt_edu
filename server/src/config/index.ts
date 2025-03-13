@@ -13,7 +13,7 @@ export const config = {
   }
 }
 
-// 添加配置验证
+// Add configuration verification
 if (!config.github.token) {
   console.error('Missing GITHUB_TOKEN in environment variables')
 } 

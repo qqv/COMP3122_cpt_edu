@@ -111,10 +111,10 @@ router.post('/ai', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (r
 // Test AI connection
 router.post('/test-ai', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 获取设置
+    // Get settings
     const { aiEndpoint, aiToken, aiModel } = req.body;
     
-    // 如果请求中没有提供，则使用数据库中的设置
+    // If not provided in request, use settings from database
     let settings = await Setting.findOne();
     const endpoint = aiEndpoint || (settings?.aiEndpoint || '');
     const token = aiToken || (settings?.aiToken || '');
@@ -123,11 +123,11 @@ router.post('/test-ai', authMiddleware, roleMiddleware([UserRole.LECTURER]), asy
       return next(new AppError('AI endpoint and token are required', 400));
     }
     
-    // 构建测试 URL (假设是 OpenAI 格式的 API)
+    // Build test URL (assuming OpenAI format API)
     const testUrl = `${endpoint}/models`;
     
     try {
-      // 发送实际请求测试连接
+      // Send actual request to test connection
       const response = await fetch(testUrl, {
         method: 'GET',
         headers: {

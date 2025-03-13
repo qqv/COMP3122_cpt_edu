@@ -9,7 +9,7 @@ import Course from '../models/course'
 
 const router = Router()
 
-// 处理普通聊天请求
+// Handle normal chat requests(Deprecation)
 router.post('/chat', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { messages } = req.body
@@ -18,13 +18,13 @@ router.post('/chat', authMiddleware, async (req: Request, res: Response, next: N
       return next(new AppError('Messages array is required', 400))
     }
     
-    // 获取AI设置
+    // Get AI settings
     const settings = await Setting.findOne()
     if (!settings || !settings.aiToken) {
       return next(new AppError('AI settings not configured', 500))
     }
     
-    // 构建AI请求
+    // Build AI request
     const aiResponse = await callAI(settings, messages)
     
     res.status(200).json({
@@ -35,7 +35,7 @@ router.post('/chat', authMiddleware, async (req: Request, res: Response, next: N
   }
 })
 
-// 分析团队协作
+// Analyze team collaboration
 router.post('/analyze-team', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { teamId, analysisType } = req.body
@@ -44,11 +44,11 @@ router.post('/analyze-team', authMiddleware, async (req: Request, res: Response,
       return next(new AppError('Team ID is required', 400))
     }
     
-    // 获取团队信息
+    // Get team information
     const team = await Team.findById(teamId)
       .populate({
         path: 'members.userId',
-        model: 'User',  // 明确指定模型
+        model: 'User',  // Explicitly specify model
         select: 'name email githubId'
       });
 
@@ -56,13 +56,13 @@ router.post('/analyze-team', authMiddleware, async (req: Request, res: Response,
       return next(new AppError('Team not found', 404))
     }
     
-    // 获取GitHub数据
+    // Get GitHub data
     const repoUrl = team.repositoryUrl
     if (!repoUrl) {
       return next(new AppError('Team has no repository URL', 400))
     }
     
-    // 解析仓库所有者和名称
+    // Parse repository owner and name
     const repoMatch = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/)
     if (!repoMatch) {
       return next(new AppError('Invalid GitHub repository URL', 400))
@@ -73,22 +73,22 @@ router.post('/analyze-team', authMiddleware, async (req: Request, res: Response,
     try {
       console.log(`Fetching GitHub data for ${owner}/${repo}`);
       
-      // 获取提交历史 - 限制数量以避免数据过大
+      // Get commit history - limit to avoid data overload
       const commits = await GitHubService.getRepositoryCommits(owner, repo.replace('.git', ''), 20);
       console.log(`Retrieved ${commits.length} commits`);
       
-      // 获取PR历史 - 限制数量
+      // Get PR history - limit quantity
       const pullRequests = await GitHubService.getRepositoryPullRequests(owner, repo.replace('.git', ''));
       console.log(`Retrieved ${pullRequests.length} pull requests`);
       
-      // 获取问题历史 - 限制数量
+      // Get issue history - limit quantity
       const issues = await GitHubService.getRepositoryIssues(owner, repo.replace('.git', ''), 'all');
-      const limitedIssues = issues.slice(0, 5); // 只取前5个
+      const limitedIssues = issues.slice(0, 5); // Only take the first 5
       console.log(`Retrieved ${issues.length} issues`);
       
-      // 构建团队成员映射
+      // Build team member mapping
       const teamMembers = team.members.map(member => {
-        // 使用类型断言来处理 ObjectId 问题
+        // Use type assertion to handle ObjectId issue
         const userId = member.userId as any;
         return {
           name: userId?.name || 'Unknown',
@@ -98,13 +98,13 @@ router.post('/analyze-team', authMiddleware, async (req: Request, res: Response,
         };
       });
       
-      // 获取AI设置
+      // Get AI settings
       const settings = await Setting.findOne();
       if (!settings || !settings.aiToken) {
         return next(new AppError('AI settings not configured', 500));
       }
       
-      // 构建简化的提示，减少数据量
+      // Build simplified prompt to reduce data volume
       let prompt = '';
       
       if (analysisType === 'collaboration') {
@@ -117,7 +117,7 @@ router.post('/analyze-team', authMiddleware, async (req: Request, res: Response,
         prompt = buildLearningPatternsPrompt(team.name, teamMembers, commits, limitedIssues);
       }
       
-      // 构建消息
+      // Build messages
       const messages = [
         {
           role: 'system',
@@ -130,11 +130,11 @@ router.post('/analyze-team', authMiddleware, async (req: Request, res: Response,
       ];
       
       console.log('Calling AI API...');
-      // 调用AI
+      // Call AI
       const aiResponse = await callAI(settings, messages);
       console.log('AI response received');
       
-      // 检查是否使用模拟模式
+      // Check if using mock mode
       const useMock = req.query.mock === 'true' || !settings.aiToken;
 
       if (useMock) {
@@ -170,7 +170,7 @@ The team demonstrates good collaboration through code reviews and issue discussi
   }
 });
 
-// 分析课程进度
+// Analyze course progress
 router.post('/analyze-course', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { courseId, analysisType } = req.body
@@ -179,14 +179,14 @@ router.post('/analyze-course', authMiddleware, async (req: Request, res: Respons
       return next(new AppError('Course ID is required', 400))
     }
     
-    // 获取课程信息
+    // Get course information
     const course = await Course.findById(courseId)
     
     if (!course) {
       return next(new AppError('Course not found', 404))
     }
     
-    // 获取该课程下的所有团队
+    // Get all teams under this course
     const teams = await Team.find({ course: courseId })
       .populate({
         path: 'members.userId',
@@ -200,10 +200,10 @@ router.post('/analyze-course', authMiddleware, async (req: Request, res: Respons
     
     console.log(`Found ${teams.length} teams for course ${course.name}`);
     
-    // 收集所有团队的 GitHub 数据
+    // Collect GitHub data for all teams
     const teamsData = await Promise.all(teams.map(async (team) => {
       try {
-        // 获取GitHub数据
+        // Get GitHub data
         const repoUrl = team.repositoryUrl
         if (!repoUrl) {
           return {
@@ -214,7 +214,7 @@ router.post('/analyze-course', authMiddleware, async (req: Request, res: Respons
           }
         }
         
-        // 解析仓库所有者和名称
+        // Parse repository owner and name
         const repoMatch = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/)
         if (!repoMatch) {
           return {
@@ -227,14 +227,14 @@ router.post('/analyze-course', authMiddleware, async (req: Request, res: Respons
         
         const [, owner, repo] = repoMatch
         
-        // 获取提交历史 - 限制数量以避免数据过大
+        // Get commit history - limit to avoid data overload
         const commits = await GitHubService.getRepositoryCommits(owner, repo.replace('.git', ''), 10);
         
-        // 获取问题历史 - 限制数量
+        // Get issue history - limit quantity
         const issues = await GitHubService.getRepositoryIssues(owner, repo.replace('.git', ''), 'all');
-        const limitedIssues = issues.slice(0, 5); // 只取前5个
+        const limitedIssues = issues.slice(0, 5); // For demo purpose, only take the first 5
         
-        // 简化数据，只保留必要信息
+        // Simplify data, only retain necessary information
         const simplifiedCommits = commits.map(c => ({
           message: c.commit?.message || '',
           date: c.commit?.author?.date || ''
@@ -263,13 +263,13 @@ router.post('/analyze-course', authMiddleware, async (req: Request, res: Respons
       }
     }));
     
-    // 获取AI设置
+    // Get AI settings
     const settings = await Setting.findOne();
     if (!settings || !settings.aiToken) {
       return next(new AppError('AI settings not configured', 500));
     }
     
-    // 检查是否使用模拟模式
+    // Check if using mock mode
     const useMock = req.query.mock === 'true' || !settings.aiToken;
     
     if (useMock) {
@@ -298,7 +298,7 @@ The course has ${teams.length} teams with varying levels of progress.
       });
     }
     
-    // 构建AI提示
+    // Build AI prompt
     const messages = [
       {
         role: 'system',
@@ -310,7 +310,7 @@ The course has ${teams.length} teams with varying levels of progress.
       }
     ];
     
-    // 调用AI API
+    // Call AI API
     try {
       const aiResponse = await callAI(settings, messages);
       console.log('AI response received for course progress');
@@ -327,27 +327,27 @@ The course has ${teams.length} teams with varying levels of progress.
   }
 });
 
-// 调用AI API
+// Call AI API
 async function callAI(settings: any, messages: any[]) {
   const endpoint = settings.aiEndpoint.trim();
   const token = settings.aiToken.trim();
   const model = settings.aiModel.trim();
   
   try {
-    // 检查端点格式
+    // Check endpoint format
     if (!endpoint.startsWith('http')) {
       throw new Error(`Invalid API endpoint: ${endpoint}`);
     }
     
     console.log(`Calling AI API at ${endpoint} with model ${model}`);
     
-    // 构建完整的 API URL
+    // Build full API URL
     let apiUrl = endpoint;
     if (!apiUrl.endsWith('/')) {
       apiUrl += '/';
     }
     
-    // 根据端点类型选择不同的 API 路径
+    // Choose different API paths based on endpoint type
     if (apiUrl.includes('openai.com')) {
       apiUrl += 'v1/chat/completions';
     } else {
@@ -356,12 +356,12 @@ async function callAI(settings: any, messages: any[]) {
     
     console.log(`Full API URL: ${apiUrl}`);
     
-    // 构建请求体
+    // Build request body
     const requestBody = {
       model: model,
       messages: messages,
       temperature: 0.7,
-      max_tokens: 1000  // 限制响应长度
+      max_tokens: 1000  // Limit response length
     };
     
     console.log('Request headers:', {
@@ -369,7 +369,7 @@ async function callAI(settings: any, messages: any[]) {
       'Content-Type': 'application/json'
     });
     
-    // 发送请求
+    // Send request
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -382,9 +382,9 @@ async function callAI(settings: any, messages: any[]) {
     console.log(`Response status: ${response.status}`);
     console.log(`Response headers:`, response.headers);
     
-    // 检查响应状态
+    // Check response status
     if (!response.ok) {
-      // 尝试获取响应内容，无论是JSON还是文本
+      // Try to get response content, whether JSON or text
       const contentType = response.headers.get('content-type');
       let errorData;
       
@@ -399,7 +399,7 @@ async function callAI(settings: any, messages: any[]) {
       throw new Error(`AI API responded with status: ${response.status}, URL: ${response.url}`);
     }
     
-    // 获取响应内容
+    // Get response content
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       const text = await response.text();
@@ -408,17 +408,17 @@ async function callAI(settings: any, messages: any[]) {
       throw new Error(`AI API returned non-JSON response: ${contentType}`);
     }
     
-    // 解析JSON响应
+    // Parse JSON response
     const data = await response.json();
     console.log('API response structure:', Object.keys(data));
     
-    // 验证响应格式
+    // Verify response format
     if (!data.choices || !data.choices[0]) {
       console.error('Unexpected API response format:', data);
       throw new Error('AI API returned an unexpected response format');
     }
     
-    // 处理不同的响应格式
+    // Handle different response formats
     let content = '';
     if (data.choices[0].message) {
       content = data.choices[0].message.content;
@@ -436,9 +436,9 @@ async function callAI(settings: any, messages: any[]) {
   }
 }
 
-// 简化的协作分析提示
+// Simplified collaboration analysis prompt
 function buildSimplifiedCollaborationPrompt(teamName: string, members: any[], commits: any[], pullRequests: any[], issues: any[]) {
-  // 提取关键信息，减少数据量
+  // Extract key information, reduce data volume
   const simplifiedCommits = commits.map(c => ({
     sha: c.sha?.substring(0, 7) || '',
     message: c.commit?.message || '',
@@ -484,9 +484,9 @@ Please provide a brief analysis of:
 `;
 }
 
-// 简化的代码分析提示
+// Simplified code analysis prompt
 function buildSimplifiedCodeAnalysisPrompt(teamName: string, members: any[], commits: any[]) {
-  // 提取关键信息，减少数据量
+  // Extract key information, reduce data volume
   const simplifiedCommits = commits.map(c => ({
     sha: c.sha?.substring(0, 7) || '',
     message: c.commit?.message || '',
@@ -510,9 +510,9 @@ Please provide a brief analysis of:
 `;
 }
 
-// 简化的进度分析提示
+// Simplified progress analysis prompt
 function buildSimplifiedProgressAnalysisPrompt(teamName: string, members: any[], commits: any[], issues: any[]) {
-  // 提取关键信息，减少数据量
+  // Extract key information, reduce data volume
   const simplifiedCommits = commits.map(c => ({
     sha: c.sha?.substring(0, 7) || '',
     message: c.commit?.message || '',
@@ -547,9 +547,9 @@ Please provide a brief analysis of:
 `;
 }
 
-// 构建课程进度分析提示
+// Build course progress analysis prompt
 function buildCourseProgressPrompt(courseName: string, teamsData: any[]) {
-  // 提取关键信息，减少数据量
+  // Extract key information, reduce data volume
   const teamsInfo = teamsData.map(team => ({
     name: team.teamName,
     members: team.members || 0,
@@ -574,16 +574,16 @@ Focus on identifying which teams might be falling behind and need additional sup
 `;
 }
 
-// 构建学习模式分析提示
+// Build learning patterns analysis prompt
 function buildLearningPatternsPrompt(teamName: string, members: any[], commits: any[], issues: any[]) {
-  // 提取关键信息，减少数据量
+  // Extract key information, reduce data volume
   const simplifiedCommits = commits.map(c => ({
     message: c.commit?.message || '',
     author: c.commit?.author?.name || c.author?.login || 'Unknown',
     date: c.commit?.author?.date || ''
   }));
   
-  // 按作者分组提交
+  // Group commits by author
   const commitsByAuthor: { [key: string]: any[] } = {};
   simplifiedCommits.forEach(commit => {
     if (!commitsByAuthor[commit.author]) {
@@ -592,7 +592,7 @@ function buildLearningPatternsPrompt(teamName: string, members: any[], commits: 
     commitsByAuthor[commit.author].push(commit);
   });
   
-  // 简化问题
+  // Simplify issues
   const simplifiedIssues = issues.slice(0, 5).map(issue => ({
     title: issue.title,
     state: issue.state,

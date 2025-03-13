@@ -10,24 +10,24 @@ import mongoose from 'mongoose'
 
 const router = Router()
 
-// 获取所有用户
+// Get all users
 router.get('/', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 首先获取所有课程
+    // First get all courses
     const courses = await Course.find().lean();
     console.log('Fetched courses:', courses);
     
-    // 获取所有用户
+    // Get all users
     const users = await User.find()
       .select('-password')
       .lean();
     console.log('Fetched users:', users);
     
-    // 为每个用户添加其作为教师的课程
+    // Add courses that the user is a teacher for to each user
     const usersWithCourses = users.map(user => ({
       ...user,
       courses: courses.filter(course => 
-        // 检查  teachers 
+        // Check if the user is a teacher for the course
         (course.teachers && course.teachers.some(teacherId => 
           teacherId.toString() === user._id.toString()
         ))
@@ -46,10 +46,10 @@ router.get('/', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req:
   }
 });
 
-// 获取单个用户
+// Get a single user
 router.get('/:id', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 获取用户基本信息
+    // Get user basic information
     const user = await User.findById(req.params.id)
       .select('-password')
       .lean();
@@ -58,12 +58,12 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response, next: Nex
       return next(new AppError('User not found', 404));
     }
 
-    // 获取该用户作为教师的所有课程
+    // Get all courses that the user is a teacher for
     const userCourses = await Course.find({
       teachers: user._id
     }).lean();
 
-    // 将课程信息添加到用户对象中
+    // Add course information to user object
     const userWithCourses = {
       ...user,
       courses: userCourses
@@ -75,22 +75,22 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response, next: Nex
   }
 });
 
-// 创建新用户 (仅限讲师)
+// Create a new user (only for lecturers)
 router.post('/', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, email, password, role, courses } = req.body
     
-    // 检查邮箱是否已存在
+    // Check if email already exists
     const existingUser = await User.findOne({ email })
     if (existingUser) {
       return next(new AppError('Email already in use', 400))
     }
     
-    // 创建新用户
+    // Create new user
     const user = new User({
       name,
       email,
-      password: password || crypto.randomBytes(8).toString('hex'), // 生成随机密码
+      password: password || crypto.randomBytes(8).toString('hex'), // Generate random password
       role,
       courses: courses || []
     })
@@ -111,12 +111,12 @@ router.post('/', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req
   }
 })
 
-// 更新用户 (仅限讲师)
+// Update user (only for lecturers)
 router.put('/:id', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, email, role, courses, active } = req.body
     
-    // 不允许通过此路由更新密码
+    // Do not allow updating password through this route
     if (req.body.password) {
       delete req.body.password
     }
@@ -137,7 +137,7 @@ router.put('/:id', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (r
   }
 })
 
-// 重置用户密码 (仅限讲师)
+// Reset user password (only for lecturers)
 router.post('/:id/reset-password', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { newPassword } = req.body;
@@ -152,7 +152,7 @@ router.post('/:id/reset-password', authMiddleware, roleMiddleware([UserRole.LECT
       return next(new AppError('User not found', 404));
     }
     
-    // 直接更新密码
+    // Update password directly
     user.password = newPassword;
     
     await user.save();
@@ -163,7 +163,7 @@ router.post('/:id/reset-password', authMiddleware, roleMiddleware([UserRole.LECT
   }
 });
 
-// 用户重置密码
+// User reset password
 router.post('/reset-password/:token', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { password } = req.body
@@ -172,13 +172,13 @@ router.post('/reset-password/:token', async (req: Request, res: Response, next: 
       return next(new AppError('Password must be at least 8 characters', 400))
     }
     
-    // 哈希令牌
+    // Hash token
     const resetPasswordToken = crypto
       .createHash('sha256')
       .update(req.params.token)
       .digest('hex')
     
-    // 查找有效的重置令牌
+    // Find valid reset token
     const user = await User.findOne({
       resetPasswordToken,
       resetPasswordExpires: { $gt: Date.now() }
@@ -188,7 +188,7 @@ router.post('/reset-password/:token', async (req: Request, res: Response, next: 
       return next(new AppError('Invalid or expired reset token', 400))
     }
     
-    // 更新密码并清除重置令牌
+    // Update password and clear reset token
     user.password = password
     user.resetPasswordToken = undefined
     user.resetPasswordExpires = undefined
@@ -201,7 +201,7 @@ router.post('/reset-password/:token', async (req: Request, res: Response, next: 
   }
 })
 
-// 分配课程给用户
+// Assign courses to user
 router.post('/:id/assign-courses', authMiddleware, roleMiddleware([UserRole.LECTURER]), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { courses } = req.body;
@@ -211,19 +211,19 @@ router.post('/:id/assign-courses', authMiddleware, roleMiddleware([UserRole.LECT
       return next(new AppError('Courses array is required', 400));
     }
 
-    // 更新所有相关课程的 teachers 数组
+    // Update teachers array for all related courses
     await Course.updateMany(
       { _id: { $in: courses } },
       { $addToSet: { teachers: userId } }
     );
 
-    // 从未选中的课程中移除该用户
+    // Remove user from unselected courses
     await Course.updateMany(
       { _id: { $nin: courses } },
       { $pull: { teachers: userId } }
     );
 
-    // 获取更新后的课程列表
+    // Get updated course list
     const updatedCourses = await Course.find({
       teachers: userId
     }).lean();

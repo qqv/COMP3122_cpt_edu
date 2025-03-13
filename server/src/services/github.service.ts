@@ -370,7 +370,7 @@ export const GitHubService = {
   },
 
   /**
-   * 获取仓库的 Pull Requests
+   * Get repository Pull Requests
    */
   async getRepositoryPullRequests(owner: string, repo: string, state: "all" | "open" | "closed" = "all"): Promise<any[]> {
     return withRetry(async () => {
@@ -386,7 +386,7 @@ export const GitHubService = {
   },
 
   /**
-   * 获取仓库的 Issues
+   * Get repository Issues
    */
   async getRepositoryIssues(owner: string, repo: string, state: "all" | "open" | "closed" = "all"): Promise<any[]> {
     return withRetry(async () => {
@@ -397,13 +397,13 @@ export const GitHubService = {
         per_page: 100
       })
       
-      // 过滤掉 Pull Requests (GitHub API 中 Issues 包含 PRs)
+      // Filter out Pull Requests (GitHub API includes PRs in Issues)
       return response.data.filter(issue => !issue.pull_request)
     })
   },
 
   /**
-   * 获取仓库的提交历史
+   * Get repository commits history
    */
   async getRepositoryCommits(owner: string, repo: string, limit = 100): Promise<any[]> {
     return withRetry(async () => {

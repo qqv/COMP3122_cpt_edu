@@ -457,7 +457,7 @@ router.post('/:id/members', async (req: Request, res: Response, next: NextFuncti
   }
 });
 
-// 更改团队领导的路由
+// Change team leader route
 router.put('/:id/leader', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { newLeaderId } = req.body;
@@ -466,14 +466,14 @@ router.put('/:id/leader', async (req: Request, res: Response, next: NextFunction
       return next(new AppError('New leader ID is required', 400));
     }
     
-    // 查找团队
+    // Find team
     const team = await Team.findById(req.params.id);
     
     if (!team) {
       return next(new AppError('Team not found', 404));
     }
     
-    // 检查新领导是否是团队成员
+    // Check if new leader is a team member
     const newLeaderIndex = team.members.findIndex(
       member => member.userId.toString() === newLeaderId
     );
@@ -482,12 +482,12 @@ router.put('/:id/leader', async (req: Request, res: Response, next: NextFunction
       return next(new AppError('New leader must be a team member', 400));
     }
     
-    // 找到当前领导
+    // Find current leader
     const currentLeaderIndex = team.members.findIndex(
       member => member.role === 'leader'
     );
     
-    // 更新角色
+    // Update role
     if (currentLeaderIndex !== -1) {
       team.members[currentLeaderIndex].role = 'member';
     }
@@ -502,29 +502,29 @@ router.put('/:id/leader', async (req: Request, res: Response, next: NextFunction
   }
 });
 
-// 添加获取可用学生的路由
+// Add route to get available students
 router.get('/:teamId/available-students', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { teamId } = req.params;
     
-    // 获取所有团队的成员ID
+    // Get all team member IDs
     const teams = await Team.find().lean();
     
-    // 获取当前团队（如果存在）
+    // Get current team (if exists)
     const currentTeam = teams.find(team => team._id.toString() === teamId);
     if (!currentTeam) {
       return next(new AppError('Team not found', 404));
     }
     
-    // 收集所有已经在团队中的学生ID
+    // Collect all student IDs already in the team
     const allTeamMemberIds = teams.flatMap(team => 
       team.members.map(member => member.userId.toString())
     );
     
-    // 获取所有学生
+    // Get all students
     const allStudents = await Student.find().lean();
     
-    // 过滤出可用的学生（不在任何团队中的学生）
+    // Filter out available students (students not in any team)
     const availableStudents = allStudents.filter(student => 
       !allTeamMemberIds.includes(student._id.toString())
     );
@@ -535,19 +535,19 @@ router.get('/:teamId/available-students', async (req: Request, res: Response, ne
   }
 });
 
-// 添加移除团队成员的路由
+// Add route to remove team member
 router.delete('/:id/members/:memberId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id, memberId } = req.params;
     
-    // 查找团队
+    // Find team
     const team = await Team.findById(id);
     
     if (!team) {
       return next(new AppError('Team not found', 404));
     }
     
-    // 检查成员是否存在
+    // Check if member exists
     const memberIndex = team.members.findIndex(
       member => member.userId.toString() === memberId
     );
@@ -556,12 +556,12 @@ router.delete('/:id/members/:memberId', async (req: Request, res: Response, next
       return next(new AppError('Member not found in team', 404));
     }
     
-    // 检查是否是团队领导
+    // Check if member is team leader
     if (team.members[memberIndex].role === 'leader') {
       return next(new AppError('Cannot remove team leader. Change leader first.', 400));
     }
     
-    // 移除成员
+    // Remove member
     team.members.splice(memberIndex, 1);
     
     await team.save();
@@ -572,7 +572,7 @@ router.delete('/:id/members/:memberId', async (req: Request, res: Response, next
   }
 });
 
-// 通过邀请码获取团队
+// Get team by invite code
 router.get('/invite/:inviteCode', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const team = await Team.findOne({ inviteCode: req.params.inviteCode })
@@ -589,7 +589,7 @@ router.get('/invite/:inviteCode', async (req: Request, res: Response, next: Next
   }
 });
 
-// 更新团队仓库URL
+// Update team repository URL
 router.put('/:id/repository', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -599,14 +599,14 @@ router.put('/:id/repository', async (req: Request, res: Response, next: NextFunc
       return next(new AppError('Repository URL is required', 400));
     }
     
-    // 查找团队
+    // Find team
     const team = await Team.findById(id);
     
     if (!team) {
       return next(new AppError('Team not found', 404));
     }
     
-    // 更新仓库URL
+    // Update repository URL
     team.repositoryUrl = repositoryUrl;
     
     await team.save();
