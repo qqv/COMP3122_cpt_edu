@@ -1,13 +1,4 @@
-import express from "express";
-import { getAllCoursesStats, getCourseStats } from "../controllers/courseStats";
-
-const router = express.Router();
-
-// Route to get course statistics including GitHub data
-router.get("/:courseId", getAllCoursesStats);
-
-export default router;
-import { Router } from 'express';
+import { Router } from "express";
 import Course from "../models/course";
 import Team from "../models/team";
 import { AppError } from "../middleware/error";
@@ -33,44 +24,49 @@ const fetchGitHubStats = async (courseId: string) => {
   };
 };
 
-router.get('/all', async (req, res, next) => {
+router.get("/all", async (req, res, next) => {
   try {
     // Get all courses
-    const courses = await Course.find().populate('teachers', 'name email role').lean()
-    
+    const courses = await Course.find()
+      .populate("teachers", "name email role")
+      .lean();
+
     // Get all teams
-    const teams = await Team.find().lean()
-    
+    const teams = await Team.find().lean();
+
     // Calculate the number of teams and students for each course
-    const coursesWithStats = await Promise.all(courses.map(async (course) => {
-      // Find all teams that belong to this course
-      const courseTeams = teams.filter(team => 
-        team.course && team.course.toString() === course._id.toString()
-      )
-      
-      // Calculate the number of teams
-      const teamsCount = courseTeams.length
-      
-      // Calculate the number of students (unique)
-      const uniqueStudentIds = new Set()
-      courseTeams.forEach(team => {
-        team.members.forEach(member => {
-          uniqueStudentIds.add(member.userId.toString())
-        })
+    const coursesWithStats = await Promise.all(
+      courses.map(async (course) => {
+        // Find all teams that belong to this course
+        const courseTeams = teams.filter(
+          (team) =>
+            team.course && team.course.toString() === course._id.toString()
+        );
+
+        // Calculate the number of teams
+        const teamsCount = courseTeams.length;
+
+        // Calculate the number of students (unique)
+        const uniqueStudentIds = new Set();
+        courseTeams.forEach((team) => {
+          team.members.forEach((member) => {
+            uniqueStudentIds.add(member.userId.toString());
+          });
+        });
+
+        return {
+          ...course,
+          stats: {
+            teams: teamsCount,
+            students: uniqueStudentIds.size,
+          },
+        };
       })
-      
-      return {
-        ...course,
-        stats: {
-          teams: teamsCount,
-          students: uniqueStudentIds.size
-        }
-      }
-    }))
-    
+    );
+
     res.status(200).json({
       status: "success",
-      data: coursesWithStats
+      data: coursesWithStats,
     });
   } catch (error) {
     if (error instanceof Error) {
@@ -81,7 +77,7 @@ router.get('/all', async (req, res, next) => {
   }
 });
 
-router.get('/:courseId', async (req, res, next) => {
+router.get("/:courseId", async (req, res, next) => {
   try {
     const { courseId } = req.params;
 
