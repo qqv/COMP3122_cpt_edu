@@ -16,6 +16,7 @@ import studentRoutes from './routes/student'
 import authRoutes from './routes/auth'
 import settingRoutes from './routes/setting'
 import aiRoutes from './routes/ai'
+import courseStatsRoutes from './routes/courseStats'
 
 dotenv.config()
 
@@ -83,6 +84,7 @@ app.use('/api/students', studentRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/settings', settingRoutes)
 app.use('/api/ai', aiRoutes)
+app.use('/api/course-stats', courseStatsRoutes)
 
 // Error handling
 app.use(errorHandler)
