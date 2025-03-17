@@ -70,26 +70,34 @@ router.get("/all", async (req, res, next) => {
                   .split("/");
 
                 if (owner && repo) {
-                  const stats = await GitHubService.getRepoStats(owner, repo);
+                  try {
+                    const stats = await GitHubService.getRepoStats(owner, repo);
 
-                  teamStats.gitHubStats = {
-                    commits: stats.commits || 0,
-                    issues: stats.issues || 0,
-                    prs: stats.prs || 0,
-                    exists: stats.exists || false,
-                  };
+                    teamStats.gitHubStats = {
+                      commits: stats.commits || 0,
+                      issues: stats.issues || 0,
+                      prs: stats.prs || 0,
+                      exists: stats.exists || false,
+                    };
 
-                  if (stats.exists) {
-                    totalCommits += stats.commits || 0;
-                    totalIssues += stats.issues || 0;
-                    totalPRs += stats.prs || 0;
-                    activeRepos++;
+                    if (stats.exists) {
+                      totalCommits += stats.commits || 0;
+                      totalIssues += stats.issues || 0;
+                      totalPRs += stats.prs || 0;
+                      activeRepos++;
+                    }
+                  } catch (githubError) {
+                    console.error(
+                      `GitHub API error for ${owner}/${repo}:`,
+                      githubError
+                    );
+                    // Keep default values for gitHubStats
                   }
                 }
-              } catch (error) {
+              } catch (parseError) {
                 console.error(
-                  `Error fetching GitHub stats for team ${team.name}:`,
-                  error
+                  `Error parsing repository URL for team ${team.name}:`,
+                  parseError
                 );
               }
             }
@@ -118,6 +126,7 @@ router.get("/all", async (req, res, next) => {
 
     res.status(200).json({
       status: "success",
+      data: coursesWithStats
     });
   } catch (error) {
     if (error instanceof Error) {
