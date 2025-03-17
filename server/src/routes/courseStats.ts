@@ -60,6 +60,14 @@ router.get("/all", async (req, res, next) => {
             teams: teamsCount,
             students: uniqueStudentIds.size,
           },
+          // Add the teams for this course to the response
+          teams: courseTeams.map(team => ({
+            _id: team._id,
+            name: team.name,
+            repositoryUrl: team.repositoryUrl,
+            memberCount: team.members.length,
+            inviteCode: team.inviteCode
+          }))
         };
       })
     );
