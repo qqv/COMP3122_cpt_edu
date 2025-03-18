@@ -115,6 +115,10 @@ router.post('/analyze-team', authMiddleware, async (req: Request, res: Response,
         prompt = buildSimplifiedProgressAnalysisPrompt(team.name, teamMembers, commits, limitedIssues);
       } else if (analysisType === 'learning') {
         prompt = buildLearningPatternsPrompt(team.name, teamMembers, commits, limitedIssues);
+      } else if (analysisType === 'issues') {
+        // 获取更多的 issues 数据用于分析
+        const allIssues = await GitHubService.getRepositoryIssues(owner, repo.replace('.git', ''), 'all');
+        prompt = buildIssueCheckerPrompt(team.name, teamMembers, allIssues);
       }
       
       // Build messages
@@ -621,6 +625,57 @@ Please provide an analysis of:
 4. Suggested learning resources or activities
 
 Focus on identifying each student's learning style, pace, and areas where they might need additional support.
+`;
+}
+
+// Build issue checker prompt
+function buildIssueCheckerPrompt(teamName: string, members: any[], issues: any[]) {
+  // Extract key information, reduce data volume
+  const simplifiedIssues = issues.map(issue => ({
+    number: issue.number,
+    title: issue.title,
+    state: issue.state,
+    created_at: issue.created_at,
+    closed_at: issue.closed_at,
+    user: issue.user?.login || 'Unknown',
+    assignees: issue.assignees?.map((a: any) => a.login) || [],
+    labels: issue.labels?.map((l: any) => l.name) || [],
+    comments: issue.comments,
+    body: issue.body?.substring(0, 200) + (issue.body?.length > 200 ? '...' : '') || ''
+  }));
+  
+  // Group by state
+  const openIssues = simplifiedIssues.filter(i => i.state === 'open');
+  const closedIssues = simplifiedIssues.filter(i => i.state === 'closed');
+  
+  return `
+Analyze GitHub issues for team "${teamName}" to evaluate their problem-solving abilities.
+
+Team Members:
+${members.map(m => `- ${m.name} (${m.githubId || 'No GitHub ID'}) - ${m.role}`).join('\n')}
+
+Issues Summary:
+- Total Issues: ${simplifiedIssues.length}
+- Open Issues: ${openIssues.length}
+- Closed Issues: ${closedIssues.length}
+- Resolution Rate: ${simplifiedIssues.length > 0 ? Math.round((closedIssues.length / simplifiedIssues.length) * 100) : 0}%
+
+Open Issues (${openIssues.length}):
+${openIssues.map(i => `#${i.number}: "${i.title}" - Created by ${i.user} on ${new Date(i.created_at).toLocaleDateString()}`).join('\n')}
+
+Recently Closed Issues (${Math.min(closedIssues.length, 5)}):
+${closedIssues.slice(0, 5).map(i => 
+  `#${i.number}: "${i.title}" - Closed on ${i.closed_at ? new Date(i.closed_at).toLocaleDateString() : 'N/A'}`
+).join('\n')}
+
+Please provide a detailed analysis of:
+1. The team's issue management and problem-solving abilities
+2. Types of issues they're facing (bugs, feature requests, documentation, etc.)
+3. How effectively they resolve issues (response time, solution quality)
+4. Patterns in unresolved issues
+5. Specific recommendations to improve their issue handling process
+
+Focus on identifying strengths and weaknesses in their problem-solving approach, and provide actionable advice.
 `;
 }
 

@@ -386,20 +386,52 @@ export const GitHubService = {
   },
 
   /**
-   * Get repository Issues
+   * Get repository Issues with more details
    */
-  async getRepositoryIssues(owner: string, repo: string, state: "all" | "open" | "closed" = "all"): Promise<any[]> {
+  async getRepositoryIssuesDetailed(owner: string, repo: string, state: "all" | "open" | "closed" = "all"): Promise<any[]> {
     return withRetry(async () => {
       const response = await octokit.issues.listForRepo({
         owner,
         repo,
         state,
-        per_page: 100
-      })
+        per_page: 100,
+        sort: 'updated',
+        direction: 'desc'
+      });
       
       // Filter out Pull Requests (GitHub API includes PRs in Issues)
-      return response.data.filter(issue => !issue.pull_request)
-    })
+      const issues = response.data.filter(issue => !issue.pull_request);
+      
+      // Get comments for each issue
+      const issuesWithComments = await Promise.all(issues.map(async (issue) => {
+        try {
+          // Only get comments if there are any
+          if (issue.comments > 0) {
+            const commentsResponse = await octokit.issues.listComments({
+              owner,
+              repo,
+              issue_number: issue.number,
+              per_page: 10 // Limit to 10 comments per issue
+            });
+            
+            return {
+              ...issue,
+              commentDetails: commentsResponse.data.map(comment => ({
+                user: comment.user?.login,
+                created_at: comment.created_at,
+                body: comment.body ? (comment.body.substring(0, 100) + (comment.body.length > 100 ? '...' : '')) : ''
+              }))
+            };
+          }
+          return issue;
+        } catch (error) {
+          console.error(`Error fetching comments for issue #${issue.number}:`, error);
+          return issue;
+        }
+      }));
+      
+      return issuesWithComments;
+    });
   },
 
   /**
@@ -414,6 +446,23 @@ export const GitHubService = {
       });
       
       return response.data;
+    });
+  },
+
+  /**
+   * Get repository Issues
+   */
+  async getRepositoryIssues(owner: string, repo: string, state: "all" | "open" | "closed" = "all"): Promise<any[]> {
+    return withRetry(async () => {
+      const response = await octokit.issues.listForRepo({
+        owner,
+        repo,
+        state,
+        per_page: 100
+      });
+      
+      // Filter out Pull Requests (GitHub API includes PRs in Issues)
+      return response.data.filter(issue => !issue.pull_request);
     });
   }
 }
