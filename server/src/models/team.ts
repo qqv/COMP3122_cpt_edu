@@ -1,13 +1,13 @@
-import mongoose, { Schema, Document } from 'mongoose'
+import mongoose, { Schema, Document, Types } from 'mongoose'
 
 export interface ITeam extends Document {
   name: string
   // description: string
   repositoryUrl: string
-  members: Array<{
-    userId: mongoose.Types.ObjectId
+  members: {
+    userId: Types.ObjectId
     role: 'leader' | 'member'
-  }>
+  }[]
   course: mongoose.Types.ObjectId
   inviteCode: string
   createdAt: Date

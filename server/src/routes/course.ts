@@ -192,4 +192,20 @@ router.post('/:id/assign-teachers', authMiddleware, roleMiddleware([UserRole.LEC
   }
 })
 
+// Get teams for a course
+router.get('/:courseId/teams', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const teams = await Team.find({ course: req.params.courseId })
+      .populate({
+        path: 'members.userId',
+        select: 'name githubId'
+      })
+      .lean();
+    
+    res.json(teams);
+  } catch (error) {
+    next(new AppError('Failed to fetch teams for course', 500));
+  }
+});
+
 export default router 

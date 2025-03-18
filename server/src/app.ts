@@ -83,6 +83,7 @@ app.use('/api/students', studentRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/settings', settingRoutes)
 app.use('/api/ai', aiRoutes)
+app.use('/api/teams/export', teamRoutes)
 
 // Error handling
 app.use(errorHandler)

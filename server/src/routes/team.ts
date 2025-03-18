@@ -1,11 +1,27 @@
 import { Router } from 'express'
 import Team from '../models/team'
 import { AppError } from '../middleware/error'
+import { authMiddleware } from '../middleware/auth'
 import type { Request, Response, NextFunction } from 'express'
 import { GitHubService } from '../services/github.service'
 import { UserService } from '../services/user.service'
 import Student from '../models/student'
 import crypto from 'crypto'
+
+interface PopulatedMember {
+  userId: {
+    name: string;
+    githubId: string;
+  };
+  role: string;
+}
+
+interface PopulatedTeam {
+  _id: any;
+  name: string;
+  members: PopulatedMember[];
+  repositoryUrl: string;
+}
 
 const router = Router()
 
@@ -614,6 +630,150 @@ router.put('/:id/repository', async (req: Request, res: Response, next: NextFunc
     res.status(200).json({ message: 'Repository URL updated successfully' });
   } catch (error) {
     next(new AppError('Failed to update repository URL', 500));
+  }
+});
+
+// 批量导出团队数据
+router.post('/export', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { teamIds } = req.body;
+    
+    if (!teamIds || !Array.isArray(teamIds) || teamIds.length === 0) {
+      return next(new AppError('Team IDs array is required', 400));
+    }
+    
+    // 获取所有团队信息
+    const teams = await Team.find({ _id: { $in: teamIds } })
+      .populate({
+        path: 'members.userId',
+        model: 'Student',
+        select: 'name githubId'
+      })
+      .populate('course')
+      .lean() as unknown as PopulatedTeam[];
+    
+    // 获取团队的 GitHub 数据
+    const teamsData = await Promise.all(teams.map(async (team) => {
+      try {
+        // 解析仓库 URL
+        const repoUrl = team.repositoryUrl;
+        if (!repoUrl) {
+          // 如果没有仓库 URL，返回基本信息
+          return team.members.map(member => ({
+            name: member.userId.name,
+            team: team.name,
+            role: member.role,
+            commits: 0,
+            prs: 0,
+            teamCommits: 0,
+            issues: 0,
+            pullRequests: 0,
+            reviews: 0,
+            lastActive: 'N/A'
+          }));
+        }
+        
+        // 从 URL 中提取所有者和仓库名
+        const [owner, repo] = repoUrl
+          .replace('https://github.com/', '')
+          .split('/');
+        
+        // 获取仓库统计信息
+        const stats = await GitHubService.getRepoStats(owner, repo.replace('.git', ''));
+        
+        // 获取提交历史
+        const commits = await GitHubService.getRepositoryCommits(owner, repo.replace('.git', ''));
+        
+        // 获取 PR 历史
+        const pullRequests = await GitHubService.getRepositoryPullRequests(owner, repo.replace('.git', ''), 'all');
+        
+        // 获取 Issue 历史
+        const issues = await GitHubService.getRepositoryIssues(owner, repo.replace('.git', ''), 'all');
+        
+        // 添加类型定义
+        const commitsByAuthor: { [key: string]: any[] } = {};
+        const prsByAuthor: { [key: string]: any[] } = {};
+
+        // 使用定义的类型
+        commits.forEach(commit => {
+          const author = commit.author?.login || commit.commit?.author?.name || 'Unknown';
+          if (!commitsByAuthor[author]) {
+            commitsByAuthor[author] = [];
+          }
+          commitsByAuthor[author].push(commit);
+        });
+
+        pullRequests.forEach(pr => {
+          const author = pr.user?.login || 'Unknown';
+          if (!prsByAuthor[author]) {
+            prsByAuthor[author] = [];
+          }
+          prsByAuthor[author].push(pr);
+        });
+        
+        // 计算每个成员的贡献
+        return team.members.map(member => {
+          const githubId = member.userId?.githubId || 'Unknown';
+          const memberCommits = commitsByAuthor[githubId] || [];
+          const memberPRs = prsByAuthor[githubId] || [];
+          
+          // 找出最后活动时间
+          const lastCommitDate = memberCommits.length > 0 
+            ? new Date(memberCommits[0].commit?.author?.date || memberCommits[0].commit?.committer?.date)
+            : null;
+          
+          const lastPRDate = memberPRs.length > 0
+            ? new Date(memberPRs[0].created_at)
+            : null;
+          
+          let lastActive = 'N/A';
+          if (lastCommitDate && lastPRDate) {
+            lastActive = lastCommitDate > lastPRDate 
+              ? lastCommitDate.toISOString() 
+              : lastPRDate.toISOString();
+          } else if (lastCommitDate) {
+            lastActive = lastCommitDate.toISOString();
+          } else if (lastPRDate) {
+            lastActive = lastPRDate.toISOString();
+          }
+          
+          return {
+            name: member.userId.name,
+            team: team.name,
+            role: member.role,
+            commits: memberCommits.length,
+            prs: memberPRs.length,
+            teamCommits: commits.length,
+            issues: issues.length,
+            pullRequests: pullRequests.length,
+            reviews: stats.reviews || 0,
+            lastActive
+          };
+        });
+      } catch (error) {
+        console.error(`Error processing team ${team._id}:`, error);
+        // 如果处理某个团队出错，返回基本信息
+        return team.members.map(member => ({
+          name: member.userId.name,
+          team: team.name,
+          role: member.role,
+          commits: 0,
+          prs: 0,
+          teamCommits: 0,
+          issues: 0,
+          pullRequests: 0,
+          reviews: 0,
+          lastActive: 'Error fetching data'
+        }));
+      }
+    }));
+    
+    // 扁平化数组
+    const flatData = teamsData.flat();
+    
+    res.status(200).json(flatData);
+  } catch (error) {
+    next(new AppError('Failed to export teams data', 500));
   }
 });
 

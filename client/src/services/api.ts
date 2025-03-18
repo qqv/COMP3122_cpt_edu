@@ -151,6 +151,24 @@ export const teamService = {
     const response = await api.get(`/teams/invite/${inviteCode}`);
     return response.data;
   },
+
+  getTeamsForCourse: async (courseId: string) => {
+    try {
+      const { data } = await api.get(`/courses/${courseId}/teams`);
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch teams');
+    }
+  },
+
+  exportTeams: async (teamIds: string[]) => {
+    try {
+      const { data } = await api.post('/teams/export', { teamIds });
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to export teams');
+    }
+  }
 }
 
 export const courseService = {
