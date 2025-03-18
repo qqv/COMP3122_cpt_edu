@@ -19,9 +19,11 @@ import {
   Avatar,
   Divider,
   IconButton,
-  Chip
+  Chip,
+  Stack,
 } from '@mui/material';
 import {
+  CheckCircleOutline as CheckCircleOutlineIcon,
   Check as CheckIcon,
   GitHub as GitHubIcon,
   PersonAdd as PersonAddIcon,
@@ -71,6 +73,8 @@ export default function TeamInvite() {
   const [selectedMembers, setSelectedMembers] = useState<Student[]>([]);
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   
   // Get invite information
   useEffect(() => {
@@ -113,12 +117,13 @@ export default function TeamInvite() {
       
       setActionSuccess('Repository URL saved successfully');
       setActionError('');
-      setActiveStep(1);
+      setActiveStep(1);  
       
       // Clear success message after 3 seconds
       setTimeout(() => {
         setActionSuccess('');
       }, 3000);
+      
     } catch (error: any) {
       console.error('Error updating repository URL:', error);
       setActionError(error.message || 'Failed to update repository URL');
@@ -187,7 +192,7 @@ export default function TeamInvite() {
           await teamService.addTeamMember(teamData._id, student._id);
         } catch (err) {
           console.error(`Failed to add member ${student.name}:`, err);
-          continue; // Continue adding other members
+          continue;
         }
       }
 
@@ -206,9 +211,22 @@ export default function TeamInvite() {
     }
   };
   
-  // Finish setup
+  const handleSubmit = async () => {
+    if (!repositoryUrl.trim()) return
+    
+    setSubmitting(true)
+    try {
+      await teamService.updateTeamRepository(teamData!._id, repositoryUrl.trim())
+      setSubmitted(true)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+  
   const handleFinish = () => {
-    navigate('/teams');
+    setSubmitted(true);
   };
   
   if (loading) {
@@ -254,6 +272,25 @@ export default function TeamInvite() {
           >
             Go to Home
           </Button>
+        </Paper>
+      </Container>
+    );
+  }
+  
+  if (submitted) {
+    return (
+      <Container maxWidth="sm" sx={{ mt: 8 }}>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <CheckCircleOutlineIcon color="success" sx={{ fontSize: 64, mb: 2 }} />
+          <Typography variant="h5" gutterBottom>
+            Repository Setup Complete!
+          </Typography>
+          <Typography color="text.secondary" paragraph>
+            Your team repository has been successfully linked. You can now start collaborating with your team members.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Repository URL: {repositoryUrl}
+          </Typography>
         </Paper>
       </Container>
     );
@@ -485,8 +522,8 @@ export default function TeamInvite() {
                       Add Selected Members
                     </Button>
                     
-                    <Button 
-                      variant="contained" 
+                    <Button
+                      variant="contained"
                       color="success"
                       onClick={handleFinish}
                     >
