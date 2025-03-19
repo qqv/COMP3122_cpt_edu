@@ -48,25 +48,57 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           
           const stats = await GitHubService.getRepoStats(owner, repo)
           
-          // Add student information
-          const membersWithDetails = team.members.map(member => ({
-            ...member,
-            user: studentMap.get(member.userId.toString())
-          }))
+          // Get contributors data
+          const contributors = await GitHubService.getRepoContributors(owner, repo)
+          
+          // Add student information and contribution information
+          const membersWithDetails = team.members.map(member => {
+            const studentInfo = studentMap.get(member.userId.toString())
+            
+            // Find the contribution information of the student
+            const contribution = contributors.find(c => 
+              c.githubId === studentInfo?.githubId
+            ) || {
+              commits: 0,
+              additions: 0,
+              deletions: 0,
+              lastCommit: null
+            }
+            
+            return {
+              ...member,
+              user: studentInfo,
+              contribution
+            }
+          })
 
           return {
             ...team,
             ...stats,
-            members: membersWithDetails
+            members: membersWithDetails,
+            exists: true
           }
         } catch (error) {
+          // If the repository does not exist, still add student information, but the contribution is 0
+          const membersWithDetails = team.members.map(member => ({
+            ...member,
+            user: studentMap.get(member.userId.toString()),
+            contribution: {
+              commits: 0,
+              additions: 0,
+              deletions: 0,
+              lastCommit: null
+            }
+          }))
+          
           return {
             ...team,
             commits: 0,
             issues: 0,
             prs: 0,
             lastActive: new Date().toISOString(),
-            exists: false
+            exists: false,
+            members: membersWithDetails
           }
         }
       })

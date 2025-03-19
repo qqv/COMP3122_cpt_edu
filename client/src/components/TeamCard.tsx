@@ -1,8 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Card, CardContent, Box, Typography, Chip, Button, Stack, IconButton,
-  Avatar, AvatarGroup, Divider, LinearProgress, Alert, Tooltip
+  Avatar, AvatarGroup, Divider, LinearProgress, Alert, Tooltip, Dialog,
+  DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemAvatar,
+  ListItemText
 } from '@mui/material'
 import {
   Email as EmailIcon,
@@ -11,7 +13,8 @@ import {
   MergeType as MergeTypeIcon,
   ArrowForward as ArrowForwardIcon,
   MoreVert as MoreVertIcon,
-  ContentCopy as ContentCopyIcon
+  ContentCopy as ContentCopyIcon,
+  Warning as WarningIcon
 } from '@mui/icons-material'
 import { formatLastActive } from '../utils/dateFormat'
 import { getActivityStatus } from '../utils/activity'
@@ -26,10 +29,27 @@ interface TeamCardProps {
 
 export const TeamCard = ({ team, onCopyInvite, onEmailLeader }: TeamCardProps) => {
   const navigate = useNavigate()
+  const [warningDialogOpen, setWarningDialogOpen] = useState(false)
   
   if (!team) {
     return null
   }
+
+  // Check if the team has a valid repository URL
+  const hasValidRepo = team.repositoryUrl && team.repositoryUrl.trim() !== '';
+
+  // Check which members have no commits - only check if repository exists and is valid
+  const membersWithoutCommits = (team.exists && hasValidRepo) ? team.members.filter(member => {
+    // Check if there is contribution data
+    if (member.contribution) {
+      return member.contribution.commits === 0;
+    }
+    // If there is no contribution data, consider it as no commit
+    return true;
+  }) : [];
+
+  // Only show warning if repository exists, is valid, and there are members without commits
+  const hasInactiveMembers = membersWithoutCommits.length > 0 && team.exists && hasValidRepo;
 
   const getTeamStatus = () => {
     if (!team.exists) {
@@ -49,9 +69,29 @@ export const TeamCard = ({ team, onCopyInvite, onEmailLeader }: TeamCardProps) =
     return `mailto:${emails}?subject=Repository Not Found - ${team.name}&body=Your team repository (${team.repositoryUrl}) could not be found. Please ensure it exists and is accessible.`
   }
 
+  const getInactiveMembersMailtoLink = () => {
+    const emails = membersWithoutCommits.map(member => {
+      const memberInfo = member.user || member.userId;
+      return memberInfo.email;
+    }).join(',');
+    
+    const subject = encodeURIComponent(`Inactive Team Members - ${team.name}`);
+    const body = encodeURIComponent(
+      `Dear team members,\n\nWe noticed that the following GitHub IDs are not found in the commit history of your team repository:\n` +
+      membersWithoutCommits.map(member => {
+        const memberInfo = member.user || member.userId;
+        return `- ${memberInfo.name} (${memberInfo.githubId})`;
+      }).join('\n') +
+      `\n\nPlease ensure that you are using the correct GitHub account for your commits.`
+    );
+    
+    return `mailto:${emails}?subject=${subject}&body=${body}`;
+  }
+
   return (
     <Card sx={{ position: 'relative' }}>
-      {!team.exists && (
+      {/* Repository does not exist or not set - show overlay */}
+      {(!hasValidRepo || !team.exists) && (
         <Box
           sx={{
             position: 'absolute',
@@ -69,10 +109,12 @@ export const TeamCard = ({ team, onCopyInvite, onEmailLeader }: TeamCardProps) =
           }}
         >
           <Typography variant="h6" color="error" gutterBottom>
-            Repository Not Found
+            {!hasValidRepo ? 'Repository Not Set' : 'Repository Not Found'}
           </Typography>
           <Typography variant="body2" color="white" align="center" mb={2}>
-            The repository for this team could not be accessed.
+            {!hasValidRepo 
+              ? 'This team has not set up a repository URL yet.' 
+              : 'The repository for this team could not be accessed.'}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Tooltip title="Email team leader">
@@ -96,30 +138,47 @@ export const TeamCard = ({ team, onCopyInvite, onEmailLeader }: TeamCardProps) =
           </Box>
         </Box>
       )}
-      <CardContent sx={{ opacity: team.exists ? 1 : 0.4 }}>
+      
+      {/* Card content */}
+      <CardContent sx={{ opacity: (!hasValidRepo || !team.exists) ? 0.4 : 1 }}>
+        {/* Team name and warning icon */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-          <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography variant="h6" gutterBottom>
               {team.name}
             </Typography>
-            {/* <Typography variant="body2" color="text.secondary" gutterBottom>
-              {team.description}
-            </Typography> */}
+            {/* Only show warning icon if there are inactive members and the repository exists */}
+            {hasInactiveMembers && (
+              <Tooltip title="Some team members have no commits">
+                <IconButton 
+                  color="warning" 
+                  size="small"
+                  onClick={() => setWarningDialogOpen(true)}
+                >
+                  <WarningIcon />
+                </IconButton>
+              </Tooltip>
+            )}
           </Box>
-          {/* <IconButton>
-            <MoreVertIcon />
-          </IconButton> */}
         </Box>
 
         <Box sx={{ mb: 3 }}>
           <AvatarGroup max={4} sx={{ mb: 2 }}>
-            {team.members.map((member) => (
-              <Avatar 
-                key={member.user?._id || member.userId?._id || Math.random().toString()} 
-                src={getGithubAvatarUrl(member.user?.githubId || member.userId?.githubId)}
-                alt={member.user?.name || member.userId?.name || 'Team member'}
-              />
-            ))}
+            {team.members.map((member) => {
+              const memberInfo = member.user || member.userId;
+              const isInactive = membersWithoutCommits.some(m => 
+                (m.user?._id || m.userId?._id) === (member.user?._id || member.userId?._id)
+              );
+              
+              return (
+                <Avatar 
+                  key={memberInfo?._id || Math.random().toString()} 
+                  src={getGithubAvatarUrl(memberInfo?.githubId)}
+                  alt={memberInfo?.name || 'Team member'}
+                  sx={isInactive && team.exists ? { border: '2px solid #FFC107' } : {}}
+                />
+              );
+            })}
           </AvatarGroup>
         </Box>
 
@@ -185,6 +244,67 @@ export const TeamCard = ({ team, onCopyInvite, onEmailLeader }: TeamCardProps) =
             View Details
           </Button>
         </Box>
+
+        {/* Warning dialog - only show when repository exists but some members have no commits */}
+        <Dialog
+          open={warningDialogOpen}
+          onClose={() => setWarningDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ bgcolor: '#FFF3E0', display: 'flex', alignItems: 'center' }}>
+            <WarningIcon color="warning" sx={{ mr: 1 }} />
+            Inactive Team Members Warning
+          </DialogTitle>
+          <DialogContent>
+            <Typography variant="body1" sx={{ mt: 2, mb: 2 }}>
+              The following team members have no commits in the repository:
+            </Typography>
+            <List>
+              {membersWithoutCommits.map((member) => {
+                const memberInfo = member.user || member.userId;
+                return (
+                  <ListItem key={memberInfo._id}>
+                    <ListItemAvatar>
+                      <Avatar src={getGithubAvatarUrl(memberInfo.githubId)} />
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={memberInfo.name}
+                      secondary={
+                        <>
+                          <Typography component="span" variant="body2">
+                            GitHub: {memberInfo.githubId}
+                          </Typography>
+                          <br />
+                          <Typography component="span" variant="body2">
+                            Email: {memberInfo.email}
+                          </Typography>
+                        </>
+                      }
+                    />
+                  </ListItem>
+                );
+              })}
+            </List>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              This could indicate that these students are not participating in the project or are using different GitHub accounts.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              startIcon={<EmailIcon />}
+              color="primary"
+              onClick={() => {
+                window.location.href = getInactiveMembersMailtoLink();
+              }}
+            >
+              Email Members
+            </Button>
+            <Button onClick={() => setWarningDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
       </CardContent>
     </Card>
   )
