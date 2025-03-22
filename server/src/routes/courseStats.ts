@@ -1,6 +1,7 @@
 import { Router } from "express";
 import Course from "../models/course";
 import Team from "../models/team";
+import Student from "../models/student";
 import { AppError } from "../middleware/error";
 import { GitHubService } from "../services/github.service";
 
@@ -13,8 +14,15 @@ router.get("/all", async (req, res, next) => {
       .populate("teachers", "name email role")
       .lean();
 
-    // Get all teams
-    const teams = await Team.find().lean();
+    // Get all teams with populated user data
+    const teams = await Team.find().populate('members.userId').lean();
+    
+    // Get all students and create a map for quick lookup
+    const students = await Student.find().lean();
+    const studentMap = new Map();
+    students.forEach(student => {
+      studentMap.set(student._id.toString(), student);
+    });
 
     // Calculate the number of teams and students for each course
     const coursesWithStats = await Promise.all(
@@ -57,6 +65,7 @@ router.get("/all", async (req, res, next) => {
                 prs: 0,
                 exists: false,
               },
+              members: [],
             };
 
             // Only process teams with repository URLs
@@ -72,6 +81,32 @@ router.get("/all", async (req, res, next) => {
                 if (owner && repo) {
                   try {
                     const stats = await GitHubService.getRepoStats(owner, repo);
+                    
+                    // Get contributors data
+                    const contributors = await GitHubService.getRepoContributors(owner, repo);
+                    
+                    // Add member details with contribution information
+                    teamStats.members = team.members.map(member => {
+                      const userId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+                      const studentInfo = studentMap.get(userId);
+                      
+                      // Find the contribution information of the student
+                      const contribution = contributors.find(c => 
+                        c.githubId === studentInfo?.githubId
+                      ) || {
+                        commits: 0,
+                        additions: 0,
+                        deletions: 0,
+                        lastCommit: null
+                      };
+                      
+                      return {
+                        userId: userId,
+                        role: member.role,
+                        user: studentInfo,
+                        contribution
+                      };
+                    });
 
                     teamStats.gitHubStats = {
                       commits: stats.commits || 0,
