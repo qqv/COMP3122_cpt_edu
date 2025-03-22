@@ -5,6 +5,15 @@ import Student from "../models/student";
 import { AppError } from "../middleware/error";
 import { GitHubService } from "../services/github.service";
 
+// Define the Contributor interface
+interface Contributor {
+  githubId: string;
+  commits: number;
+  additions: number;
+  deletions: number;
+  lastCommit: string | null;
+}
+
 const router = Router();
 
 router.get("/all", async (req, res, next) => {
@@ -53,7 +62,28 @@ router.get("/all", async (req, res, next) => {
         // Process teams with GitHub stats
         const teamsWithStats = await Promise.all(
           courseTeams.map(async (team) => {
-            let teamStats = {
+            // Define the type for team stats with members array
+            interface TeamStats {
+              _id: any;
+              name: string;
+              repositoryUrl: string;
+              memberCount: number;
+              inviteCode: string;
+              gitHubStats: {
+                commits: number;
+                issues: number;
+                prs: number;
+                exists: boolean;
+              };
+              members: Array<{
+                userId: string;
+                role: 'leader' | 'member';
+                user: any;
+                contribution: any;
+              }>;
+            }
+
+            let teamStats: TeamStats = {
               _id: team._id,
               name: team.name,
               repositoryUrl: team.repositoryUrl,
@@ -91,7 +121,7 @@ router.get("/all", async (req, res, next) => {
                       const studentInfo = studentMap.get(userId);
                       
                       // Find the contribution information of the student
-                      const contribution = contributors.find(c => 
+                      const contribution = contributors.find((c: Contributor) => 
                         c.githubId === studentInfo?.githubId
                       ) || {
                         commits: 0,
@@ -102,7 +132,7 @@ router.get("/all", async (req, res, next) => {
                       
                       return {
                         userId: userId,
-                        role: member.role,
+                        role: member.role as 'leader' | 'member',
                         user: studentInfo,
                         contribution
                       };
