@@ -126,7 +126,7 @@ router.get("/all", async (req, res, next) => {
 
     res.status(200).json({
       status: "success",
-      data: coursesWithStats
+      data: coursesWithStats,
     });
   } catch (error) {
     if (error instanceof Error) {
