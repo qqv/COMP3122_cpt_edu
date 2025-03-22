@@ -37,7 +37,10 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
-  Tooltip
+  Tooltip,
+  Checkbox,
+  FormControlLabel,
+  TableContainer
 } from '@mui/material'
 import {
   MoreVert as MoreVertIcon,
@@ -51,7 +54,8 @@ import {
   ContentCopy as ContentCopyIcon,
   Delete as DeleteIcon,
   Email as EmailIcon,
-  CloudUpload as CloudUploadIcon
+  CloudUpload as CloudUploadIcon,
+  FileDownload as FileDownloadIcon
 } from '@mui/icons-material'
 import Sidebar from '../components/Sidebar'
 import { useNavigate } from 'react-router-dom'
@@ -62,6 +66,19 @@ import { TeamCard } from '../components/TeamCard'
 import { courseService } from '../services/api'
 import { studentService } from '../services/api'
 import { getGithubAvatarUrl } from '../utils/github'
+
+interface Team {
+  _id: string;
+  name: string;
+  members: {
+    userId: {
+      name: string;
+      githubId: string;
+    };
+    role: string;
+  }[];
+  repositoryUrl: string;
+}
 
 const getActivityColor = (index: number) => {
   const colors = ['#4CAF50', '#2196F3', '#FF9800', '#F44336'] // 绿、蓝、橙、红
@@ -106,6 +123,11 @@ export default function Teams() {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTeams, setFilteredTeams] = useState<any[]>([]);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [selectedCourseForExport, setSelectedCourseForExport] = useState('');
+  const [teamsForExport, setTeamsForExport] = useState<Team[]>([]);
+  const [selectedTeamsForExport, setSelectedTeamsForExport] = useState<string[]>([]);
+  const [exportLoading, setExportLoading] = useState(false);
 
   // Extract fetchTeams as a separate function
   const fetchTeams = async () => {
@@ -317,6 +339,111 @@ export default function Teams() {
     }
   };
 
+  // 打开导出对话框
+  const handleOpenExportDialog = () => {
+    setExportDialogOpen(true);
+    // 重置选择
+    setSelectedCourseForExport('');
+    setTeamsForExport([]);
+    setSelectedTeamsForExport([]);
+  };
+
+  // 关闭导出对话框
+  const handleCloseExportDialog = () => {
+    setExportDialogOpen(false);
+  };
+
+  // 处理课程选择变化
+  const handleExportCourseChange = async (courseId: string) => {
+    setSelectedCourseForExport(courseId);
+    setSelectedTeamsForExport([]);
+    
+    try {
+      const data = await teamService.getTeams();
+      if (data) {
+        const courseTeams = data.filter(team => team.course?._id === courseId);
+        setTeamsForExport(courseTeams);
+      }
+    } catch (error) {
+      console.error('Failed to fetch teams for course:', error);
+    }
+  };
+
+  // 处理团队选择变化
+  const handleTeamSelectionChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+    setSelectedTeamsForExport(event.target.value as string[]);
+  };
+
+  // 全选/取消全选
+  const handleSelectAllTeams = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedTeamsForExport(teamsForExport.map(team => team._id));
+    } else {
+      setSelectedTeamsForExport([]);
+    }
+  };
+
+  // 导出团队数据
+  const handleExportTeams = async () => {
+    if (selectedTeamsForExport.length === 0) return;
+    
+    setExportLoading(true);
+    
+    try {
+      const data = await teamService.exportTeams(selectedTeamsForExport);
+      
+      if (!data || !Array.isArray(data)) {
+        throw new Error('Invalid data format received from server');
+      }
+      
+      // 将数据转换为 CSV 格式
+      const csvContent = convertToCSV(data);
+      
+      // 创建下载链接
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `teams_export_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      handleCloseExportDialog();
+    } catch (error) {
+      console.error('Failed to export teams:', error);
+      // 可以添加错误提示
+      setSnackbar({
+        open: true,
+        message: 'Failed to export teams data',
+        severity: 'error'
+      });
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  // 将数据转换为 CSV 格式
+  const convertToCSV = (data: any[]) => {
+    // CSV 头部
+    const header = 'Name,Team,Role,Commits,PRs,Team Commits,Issues,Pull Requests,Reviews,Last Active\n';
+    
+    // 将每一行数据转换为 CSV 格式
+    const rows = data.map(row => {
+      return `"${row.name}","${row.team}","${row.role}",${row.commits},${row.prs},${row.teamCommits},${row.issues},${row.pullRequests},${row.reviews},"${row.lastActive}"`;
+    }).join('\n');
+    
+    return header + rows;
+  };
+
+  const handleOpenBatchDialog = () => {
+    setBatchDialogOpen(true);
+  };
+
+  const handleCloseBatchDialog = () => {
+    setBatchDialogOpen(false);
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -359,14 +486,22 @@ export default function Teams() {
                 }}
               />
             </Box>
-            <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Button
+                variant="outlined"
+                startIcon={<FileDownloadIcon />}
+                onClick={handleOpenExportDialog}
+                sx={{ mr: 2 }}
+              >
+                Bulk Export
+              </Button>
               <Button
                 variant="outlined"
                 startIcon={<CloudUploadIcon />}
-                onClick={() => setBatchDialogOpen(true)}
+                onClick={handleOpenBatchDialog}
                 sx={{ mr: 2 }}
               >
-                Batch Create
+                Batch Operation
               </Button>
               <Button
                 variant="contained"
@@ -521,7 +656,7 @@ export default function Teams() {
         {/* Batch create team dialog */}
         <Dialog 
           open={batchDialogOpen} 
-          onClose={() => setBatchDialogOpen(false)}
+          onClose={handleCloseBatchDialog}
           maxWidth="md"
           fullWidth
         >
@@ -565,7 +700,7 @@ Team C, leader.c@example.com"
             </FormControl>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setBatchDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleCloseBatchDialog}>Cancel</Button>
             <Button onClick={handleBatchCreateTeams} variant="contained">Create Teams</Button>
           </DialogActions>
         </Dialog>
@@ -638,6 +773,93 @@ Team C, leader.c@example.com"
               }}
             >
               Export CSV
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Export Dialog */}
+        <Dialog open={exportDialogOpen} onClose={handleCloseExportDialog} maxWidth="md" fullWidth>
+          <DialogTitle>Export Teams Data</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary" paragraph sx={{ mt: 1 }}>
+              Select a course and teams to export data as CSV.
+            </Typography>
+            
+            {/* Course Selection */}
+            <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
+              <InputLabel>Course</InputLabel>
+              <Select
+                value={selectedCourseForExport}
+                label="Course"
+                onChange={(e) => handleExportCourseChange(e.target.value as string)}
+              >
+                {courses.map((course) => (
+                  <MenuItem key={course._id} value={course._id}>
+                    {course.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            {/* Teams Selection */}
+            {selectedCourseForExport && teamsForExport.length > 0 && (
+              <>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={selectedTeamsForExport.length === teamsForExport.length}
+                      onChange={handleSelectAllTeams}
+                      indeterminate={selectedTeamsForExport.length > 0 && selectedTeamsForExport.length < teamsForExport.length}
+                    />
+                  }
+                  label="Select All Teams"
+                />
+                
+                <TableContainer component={Paper} sx={{ mt: 2 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell padding="checkbox">Select</TableCell>
+                        <TableCell>Team Name</TableCell>
+                        <TableCell>Members</TableCell>
+                        <TableCell>Repository</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {teamsForExport.map((team) => (
+                        <TableRow key={team._id}>
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              checked={selectedTeamsForExport.includes(team._id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedTeamsForExport([...selectedTeamsForExport, team._id]);
+                                } else {
+                                  setSelectedTeamsForExport(selectedTeamsForExport.filter(id => id !== team._id));
+                                }
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>{team.name}</TableCell>
+                          <TableCell>{team.members.length}</TableCell>
+                          <TableCell>{team.repositoryUrl ? 'Yes' : 'No'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseExportDialog}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={handleExportTeams}
+              disabled={selectedTeamsForExport.length === 0 || exportLoading}
+              startIcon={exportLoading ? <CircularProgress size={20} /> : <FileDownloadIcon />}
+            >
+              {exportLoading ? 'Exporting...' : 'Export Selected Teams'}
             </Button>
           </DialogActions>
         </Dialog>

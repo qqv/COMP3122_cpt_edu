@@ -152,6 +152,16 @@ export default function Assistant() {
         // Open team selection dialog, but set different analysis type
         handleOpenLearningPatterns();
       }
+    },
+    {
+      id: 'issue-checker',
+      title: 'Issue Checker',
+      description: 'Evaluate team\'s problem-solving abilities by analyzing GitHub issues',
+      icon: <BugReportIcon fontSize="large" color="primary" />,
+      action: () => {
+        // 打开团队选择对话框，设置分析类型为 issues
+        handleOpenIssueChecker();
+      }
     }
   ]
 
@@ -256,12 +266,31 @@ export default function Assistant() {
     }
   }
   
+  // Open Issue Checker analysis dialog
+  const handleOpenIssueChecker = () => {
+    setAnalysisType('issues');
+    setOpenCourseDialog(true);
+    
+    // If courses are not loaded yet, load them
+    if (courses.length === 0) {
+      const fetchCourses = async () => {
+        try {
+          const { data } = await api.get('/courses');
+          setCourses(data);
+        } catch (error) {
+          console.error('Failed to fetch courses:', error);
+        }
+      };
+      fetchCourses();
+    }
+  }
+  
   // Modify handleGenerateAnalysis function
   const handleGenerateAnalysis = async () => {
     // For course progress analysis, only check course ID
     if (analysisType === 'progress' && !selectedCourse) return;
-    // For team collaboration and learning patterns analysis, check team ID
-    if ((analysisType === 'collaboration' || analysisType === 'learning') && !selectedTeam) return;
+    // For team collaboration, learning patterns and issue checker analysis, check team ID
+    if ((analysisType === 'collaboration' || analysisType === 'learning' || analysisType === 'issues') && !selectedTeam) return;
     
     try {
       setLoading(true);
@@ -272,6 +301,8 @@ export default function Assistant() {
         setActiveFeature('course-progress');
       } else if (analysisType === 'learning') {
         setActiveFeature('learning-patterns');
+      } else if (analysisType === 'issues') {
+        setActiveFeature('issue-checker');
       } else {
         setActiveFeature('team-collaboration');
       }
@@ -354,9 +385,10 @@ export default function Assistant() {
             Leverage AI to analyze course data and gain insights to enhance teaching effectiveness.
           </Typography>
 
+          {/* AI Features */}
           <Grid container spacing={3} sx={{ mb: 4 }}>
             {assistantFeatures.map((feature) => (
-              <Grid item xs={12} sm={6} md={4} key={feature.id}>
+              <Grid item xs={12} sm={6} md={3} key={feature.id}>
                 <Card 
                   sx={{ 
                     height: '100%', 
@@ -369,25 +401,24 @@ export default function Assistant() {
                     }
                   }}
                 >
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                  <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                    <Box sx={{ mb: 2 }}>
                       {feature.icon}
                     </Box>
-                    <Typography variant="h6" component="h2" align="center" gutterBottom>
+                    <Typography variant="h6" component="h3" gutterBottom>
                       {feature.title}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1, mb: 2 }}>
                       {feature.description}
                     </Typography>
                   </CardContent>
-                  <CardActions>
+                  <CardActions sx={{ justifyContent: 'center', pb: 2 }}>
                     <Button 
-                      fullWidth 
-                      variant="contained" 
+                      variant="outlined" 
+                      color="primary"
                       onClick={feature.action}
-                      disabled={loading}
                     >
-                      {loading && activeFeature === feature.id ? 'Processing...' : 'Generate Analysis'}
+                      Use This Feature
                     </Button>
                   </CardActions>
                 </Card>
@@ -470,7 +501,9 @@ export default function Assistant() {
             ? 'Select Course for Progress Analysis' 
             : analysisType === 'learning'
               ? 'Select Team for Learning Patterns Analysis'
-              : 'Select Team for Collaboration Analysis'}
+              : analysisType === 'issues'
+                ? 'Select Team for Issue Checker'
+                : 'Select Team for Collaboration Analysis'}
         </DialogTitle>
         <DialogContent>
           <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
@@ -488,8 +521,8 @@ export default function Assistant() {
             </Select>
           </FormControl>
           
-          {/* Display team selection for team collaboration and learning patterns analysis */}
-          {(analysisType === 'collaboration' || analysisType === 'learning') && selectedCourse && (
+          {/* Display team selection for team collaboration, learning patterns and issue checker analysis */}
+          {(analysisType === 'collaboration' || analysisType === 'learning' || analysisType === 'issues') && selectedCourse && (
             <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Team</InputLabel>
               <Select
@@ -513,7 +546,7 @@ export default function Assistant() {
             variant="contained" 
             disabled={
               (analysisType === 'progress' && !selectedCourse) || 
-              ((analysisType === 'collaboration' || analysisType === 'learning') && (!selectedCourse || !selectedTeam))
+              ((analysisType === 'collaboration' || analysisType === 'learning' || analysisType === 'issues') && (!selectedCourse || !selectedTeam))
             }
           >
             Generate Analysis
