@@ -14,6 +14,35 @@ interface Contributor {
   lastCommit: string | null;
 }
 
+// Define the type for team stats with members array
+interface TeamStats {
+  _id: any;
+  name: string;
+  repositoryUrl: string;
+  memberCount: number;
+  inviteCode: string;
+  gitHubStats: {
+    commits: number;
+    issues: number;
+    prs: number;
+    exists: boolean;
+  };
+  members: Array<{
+    userId: string;
+    role: "leader" | "member";
+    user: any;
+    contribution: any;
+  }>;
+}
+// const contribution = contributors.find(
+//   (c : Contributor) => c.githubId === studentInfo?.githubId
+// ) || {
+//   commits: 0,
+//   additions: 0,
+//   deletions: 0,
+//   lastCommit: null,
+// };
+
 const router = Router();
 
 router.get("/all", async (req, res, next) => {
@@ -24,12 +53,12 @@ router.get("/all", async (req, res, next) => {
       .lean();
 
     // Get all teams with populated user data
-    const teams = await Team.find().populate('members.userId').lean();
-    
+    const teams = await Team.find().populate("members.userId").lean();
+
     // Get all students and create a map for quick lookup
     const students = await Student.find().lean();
     const studentMap = new Map();
-    students.forEach(student => {
+    students.forEach((student) => {
       studentMap.set(student._id.toString(), student);
     });
 
@@ -62,27 +91,6 @@ router.get("/all", async (req, res, next) => {
         // Process teams with GitHub stats
         const teamsWithStats = await Promise.all(
           courseTeams.map(async (team) => {
-            // Define the type for team stats with members array
-            interface TeamStats {
-              _id: any;
-              name: string;
-              repositoryUrl: string;
-              memberCount: number;
-              inviteCode: string;
-              gitHubStats: {
-                commits: number;
-                issues: number;
-                prs: number;
-                exists: boolean;
-              };
-              members: Array<{
-                userId: string;
-                role: 'leader' | 'member';
-                user: any;
-                contribution: any;
-              }>;
-            }
-
             let teamStats: TeamStats = {
               _id: team._id,
               name: team.name,
@@ -111,30 +119,33 @@ router.get("/all", async (req, res, next) => {
                 if (owner && repo) {
                   try {
                     const stats = await GitHubService.getRepoStats(owner, repo);
-                    
+
                     // Get contributors data
-                    const contributors = await GitHubService.getRepoContributors(owner, repo);
-                    
+                    const contributors =
+                      await GitHubService.getRepoContributors(owner, repo);
+
                     // Add member details with contribution information
-                    teamStats.members = team.members.map(member => {
-                      const userId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+                    teamStats.members = team.members.map((member) => {
+                      const userId = member.userId._id
+                        ? member.userId._id.toString()
+                        : member.userId.toString();
                       const studentInfo = studentMap.get(userId);
-                      
+
                       // Find the contribution information of the student
-                      const contribution = contributors.find((c: Contributor) => 
-                        c.githubId === studentInfo?.githubId
+                      const contribution = contributors.find(
+                        (c) => c.githubId === studentInfo?.githubId
                       ) || {
                         commits: 0,
                         additions: 0,
                         deletions: 0,
-                        lastCommit: null
+                        lastCommit: null,
                       };
-                      
+
                       return {
                         userId: userId,
-                        role: member.role as 'leader' | 'member',
+                        role: member.role as "leader" | "member",
                         user: studentInfo,
-                        contribution
+                        contribution,
                       };
                     });
 
@@ -190,8 +201,8 @@ router.get("/all", async (req, res, next) => {
     );
 
     res.status(200).json({
-      status: "success",
-      data: coursesWithStats,
+      // status: "success",
+      courses: coursesWithStats,
     });
   } catch (error) {
     if (error instanceof Error) {
