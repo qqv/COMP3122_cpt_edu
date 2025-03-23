@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Container,
@@ -25,6 +25,8 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import {
   Code as CodeIcon,
@@ -36,6 +38,7 @@ import {
 import { BarChart, LineChart } from "@mui/x-charts";
 import Sidebar from "../components/Sidebar";
 import { PieChart } from "@mui/x-charts";
+import { courseService } from "../services/api";
 
 // 课程数据
 const courses = [
@@ -204,7 +207,10 @@ const activityDistribution = {
 
 export default function Dashboard() {
   // 状态管理
-  const [selectedCourse, setSelectedCourse] = useState(courses[0].id);
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [courseStats, setCourseStats] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // 处理课程变更
   const handleCourseChange = (event) => {
@@ -212,7 +218,33 @@ export default function Dashboard() {
   };
 
   // 获取当前选中的课程
-  const currentCourse = courses.find((course) => course.id === selectedCourse);
+  const currentCourse = courses.find((course) => course.id === selectedCourse) || courses[0];
+  
+  // 获取所有课程统计数据
+  const fetchCourseStats = async () => {
+    try {
+      setLoading(true);
+      const data = await courseService.getAllCourseStats();
+      setCourseStats(data);
+      console.log("Course stats fetched:", data);
+      setError(null);
+      
+      // If there are courses in the response, select the first one
+      if (data && data.length > 0) {
+        setSelectedCourse(data[0]._id);
+      }
+    } catch (err) {
+      console.error("Error fetching course stats:", err);
+      setError(err.message || 'Failed to fetch course statistics');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // 在组件加载时获取课程统计数据
+  useEffect(() => {
+    fetchCourseStats();
+  }, []);
 
   // 图表数据 - Team Commits Comparison
   const teamCommitsData = {
@@ -348,7 +380,16 @@ export default function Dashboard() {
           </Box>
         </Paper>
 
-        <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Box sx={{ p: 3 }}>
+            <Alert severity="error">{error}</Alert>
+          </Box>
+        ) : (
+          <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
           {/* Summary Cards */}
           <Grid container spacing={3} mb={3}>
             {/* Total Commits Card */}
@@ -655,7 +696,8 @@ export default function Dashboard() {
               </Paper>
             </Grid>
           </Grid>
-        </Container>
+          </Container>
+        )}
       </Box>
     </Box>
   );
