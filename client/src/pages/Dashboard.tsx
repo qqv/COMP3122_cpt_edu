@@ -587,7 +587,7 @@ export default function Dashboard() {
                 >
                   <Typography variant="h6">Low Active Students</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Students with <5% Contribution ({lowActiveStudents.length})
+                    Students with &lt;5% Contribution ({lowActiveStudents.length})
                   </Typography>
                 </Box>
                 <List sx={{ overflow: "auto", maxHeight: 520 }}>
