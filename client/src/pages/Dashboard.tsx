@@ -544,6 +544,7 @@ export default function Dashboard() {
                     xAxis={[{ data: getTeamCommitsData().labels, scaleType: "band" }]}
                     height={250}
                     colors={['#1976d2']}
+                    tooltip={{ trigger: 'item' }}
                     slotProps={{
                       legend: {
                         direction: "row",
@@ -585,6 +586,7 @@ export default function Dashboard() {
                     ]}
                     height={250}
                     margin={{ top: 10, bottom: 50, left: 20, right: 20 }}
+                    tooltip={{ trigger: 'item' }}
                     slotProps={{
                       legend: {
                         direction: "row",
