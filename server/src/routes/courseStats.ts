@@ -59,6 +59,16 @@ interface CourseWithStats {
   };
   teams: TeamStats[];
   recentCommits?: Array<any>;
+  lowActiveStudents?: Array<{
+    student: any;
+    team: {
+      id: any;
+      name: string;
+    };
+    commitPercentage: number;
+    commits: number;
+    teamTotalCommits: number;
+  }>;
 }
 // const contribution = contributors.find(
 //   (c : Contributor) => c.githubId === studentInfo?.githubId
@@ -116,6 +126,18 @@ router.get("/all", async (req, res, next) => {
         
         // Array to collect all recent commits across teams in this course
         let allCourseCommits: any[] = [];
+        
+        // Array to collect low active students
+        let lowActiveStudents: Array<{
+          student: any;
+          team: {
+            id: any;
+            name: string;
+          };
+          commitPercentage: number;
+          commits: number;
+          teamTotalCommits: number;
+        }> = [];
 
         // Process teams with GitHub stats
         const teamsWithStats = await Promise.all(
@@ -156,6 +178,11 @@ router.get("/all", async (req, res, next) => {
                     // Get recent commits
                     const recentCommits = await GitHubService.getRecentCommits(owner, repo, 10);
 
+                    // Calculate total team commits
+                    const teamTotalCommits = contributors.reduce(
+                      (total, contributor) => total + contributor.commits, 0
+                    );
+                    
                     // Add member details with contribution information
                     teamStats.members = team.members.map((member) => {
                       const userId = member.userId._id
@@ -172,12 +199,32 @@ router.get("/all", async (req, res, next) => {
                         deletions: 0,
                         lastCommit: null,
                       };
+                      
+                      // Calculate commit percentage for this student
+                      const commitPercentage = teamTotalCommits > 0 
+                        ? (contribution.commits / teamTotalCommits) * 100 
+                        : 0;
+                        
+                      // Check if this is a low active student (less than 5% of team commits)
+                      if (teamTotalCommits > 0 && commitPercentage < 5 && studentInfo) {
+                        lowActiveStudents.push({
+                          student: studentInfo,
+                          team: {
+                            id: team._id,
+                            name: team.name
+                          },
+                          commitPercentage,
+                          commits: contribution.commits,
+                          teamTotalCommits
+                        });
+                      }
 
                       return {
                         userId: userId,
                         role: member.role as "leader" | "member",
                         user: studentInfo,
                         contribution,
+                        commitPercentage
                       };
                     });
 
@@ -258,6 +305,8 @@ router.get("/all", async (req, res, next) => {
           teams: teamsWithStats,
           // Add recent commits for the entire course
           recentCommits: recentCourseCommits,
+          // Add low active students
+          lowActiveStudents: lowActiveStudents,
         };
       })
     );
