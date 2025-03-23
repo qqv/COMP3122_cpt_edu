@@ -215,18 +215,56 @@ export default function Dashboard() {
   // 获取当前选中的课程
   const currentCourse = courses.find((course) => course.id === selectedCourse);
 
-  // 图表数据
-  // 图表数据
-  const progressData = {
-    labels: ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6"],
+  // 图表数据 - Team Commits Comparison
+  const teamCommitsData = {
+    labels: ["Team Alpha", "Team Beta", "Team Gamma", "Team Delta", "Team Epsilon"],
     datasets: [
       {
-        data: [5, 15, 25, 30, 45, 60],
-        label: "Team Alpha",
-      },
-      // ... 其他团队数据
+        data: [142, 98, 165, 87, 32],
+        label: "Total Commits",
+      }
     ],
   };
+  
+  // Sample low active students data
+  const lowActiveStudents = [
+    {
+      student: {
+        _id: "67d7cb2cdd317c59555c3084",
+        name: "Master, Real",
+        email: "sarah.wong@example.com",
+        githubId: "Chris12420",
+        __v: 0,
+        createdAt: "2025-03-17T07:11:40.306Z",
+        updatedAt: "2025-03-17T07:11:40.306Z"
+      },
+      team: {
+        id: "67d7cb2cdd317c59555c308e",
+        name: "Team Alpha"
+      },
+      commitPercentage: 0,
+      commits: 0,
+      teamTotalCommits: 50
+    },
+    {
+      student: {
+        _id: "67d7cb2cdd317c59555c3086",
+        name: "Master, AI",
+        email: "emily.chen@example.com",
+        githubId: "lyxsq99",
+        __v: 0,
+        createdAt: "2025-03-17T07:11:40.306Z",
+        updatedAt: "2025-03-17T07:11:40.306Z"
+      },
+      team: {
+        id: "67d7cb2cdd317c59555c308e",
+        name: "Team Alpha"
+      },
+      commitPercentage: 0,
+      commits: 0,
+      teamTotalCommits: 50
+    }
+  ];
 
   return (
     <Box sx={{ display: "flex" }}>
@@ -435,13 +473,14 @@ export default function Dashboard() {
             <Grid item xs={12} lg={8}>
               <Paper sx={{ p: 3, height: "100%" }}>
                 <Typography variant="h6" gutterBottom>
-                  Team Progress
+                  Team Commits Comparison
                 </Typography>
                 <Box sx={{ height: 300, pt: 2 }}>
-                  <LineChart
-                    series={progressData.datasets}
-                    xAxis={[{ data: progressData.labels, scaleType: "band" }]}
+                  <BarChart
+                    series={teamCommitsData.datasets}
+                    xAxis={[{ data: teamCommitsData.labels, scaleType: "band" }]}
                     height={250}
+                    colors={['#1976d2']}
                     slotProps={{
                       legend: {
                         direction: "row",
@@ -515,7 +554,6 @@ export default function Dashboard() {
                     <TableCell>Commits</TableCell>
                     <TableCell>Issues</TableCell>
                     <TableCell>PRs</TableCell>
-                    <TableCell>Progress</TableCell>
                     <TableCell>Last Activity</TableCell>
                   </TableRow>
                 </TableHead>
@@ -527,23 +565,6 @@ export default function Dashboard() {
                       <TableCell>{team.commits}</TableCell>
                       <TableCell>{team.issues}</TableCell>
                       <TableCell>{team.prs}</TableCell>
-                      <TableCell>
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          <Box sx={{ width: "100%", mr: 1 }}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={team.progress}
-                              sx={{
-                                height: 6,
-                                borderRadius: 3,
-                              }}
-                            />
-                          </Box>
-                          <Typography variant="body2" color="text.secondary">
-                            {team.progress}%
-                          </Typography>
-                        </Box>
-                      </TableCell>
                       <TableCell>{team.lastActivity}</TableCell>
                     </TableRow>
                   ))}
@@ -564,22 +585,22 @@ export default function Dashboard() {
                     mb: 2,
                   }}
                 >
-                  <Typography variant="h6">Student Performance</Typography>
+                  <Typography variant="h6">Low Active Students</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    All Students ({students.length})
+                    Students with <5% Contribution ({lowActiveStudents.length})
                   </Typography>
                 </Box>
                 <List sx={{ overflow: "auto", maxHeight: 520 }}>
-                  {students.map((student) => (
-                    <ListItem key={student.name}>
+                  {lowActiveStudents.map((item) => (
+                    <ListItem key={item.student._id}>
                       <ListItemAvatar>
-                        <Avatar src={student.avatar} />
+                        <Avatar>{item.student.name.charAt(0)}</Avatar>
                       </ListItemAvatar>
                       <ListItemText
                         primary={
                           <Box sx={{ display: "flex", alignItems: "center" }}>
                             <Typography variant="subtitle2">
-                              {student.name}
+                              {item.student.name}
                             </Typography>
                             <Box
                               sx={{
@@ -588,21 +609,11 @@ export default function Dashboard() {
                                 py: 0.5,
                                 borderRadius: 1,
                                 fontSize: "0.75rem",
-                                bgcolor:
-                                  student.status === "Active"
-                                    ? "success.100"
-                                    : student.status === "Warning"
-                                    ? "warning.100"
-                                    : "error.100",
-                                color:
-                                  student.status === "Active"
-                                    ? "success.700"
-                                    : student.status === "Warning"
-                                    ? "warning.700"
-                                    : "error.700",
+                                bgcolor: "error.100",
+                                color: "error.700",
                               }}
                             >
-                              {student.status}
+                              Low Activity
                             </Box>
                           </Box>
                         }
@@ -613,41 +624,21 @@ export default function Dashboard() {
                                 display: "flex",
                                 alignItems: "center",
                                 mb: 0.5,
+                                justifyContent: "space-between"
                               }}
                             >
-                              <Box sx={{ flexGrow: 1, mr: 1 }}>
-                                <LinearProgress
-                                  variant="determinate"
-                                  value={student.progress}
-                                  sx={{
-                                    height: 6,
-                                    borderRadius: 3,
-                                    bgcolor: "grey.100",
-                                    "& .MuiLinearProgress-bar": {
-                                      bgcolor:
-                                        student.progress > 75
-                                          ? "success.main"
-                                          : student.progress > 50
-                                          ? "primary.main"
-                                          : student.progress > 25
-                                          ? "warning.main"
-                                          : "error.main",
-                                    },
-                                  }}
-                                />
-                              </Box>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                              >
-                                {student.progress}%
+                              <Typography variant="body2" color="text.secondary">
+                                Commits: {item.commits} / {item.teamTotalCommits}
+                              </Typography>
+                              <Typography variant="body2" color="error.main">
+                                {item.commitPercentage.toFixed(1)}%
                               </Typography>
                             </Box>
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
-                              {student.role}
+                              Team: {item.team.name} • GitHub: {item.student.githubId || "Not linked"}
                             </Typography>
                           </Box>
                         }
