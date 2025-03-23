@@ -201,20 +201,29 @@ const recentActivities = [
 export default function Dashboard() {
   // Generate activity distribution data from current course
   const getActivityDistribution = () => {
-    if (!currentCourse) {
+    if (!currentCourse || !currentCourse.stats || !currentCourse.stats.github) {
       return {
-        data: [0, 0, 0],
+        data: [1, 0, 0], // At least one non-zero value to prevent chart errors
         labels: ["Commits", "Issues", "Pull Requests"],
         colors: ["#1976d2", "#2e7d32", "#9c27b0"],
       };
     }
     
+    const commits = currentCourse.stats.github.totalCommits || 0;
+    const issues = currentCourse.stats.github.totalIssues || 0;
+    const prs = currentCourse.stats.github.totalPRs || 0;
+    
+    // If all values are zero, add a placeholder to prevent chart errors
+    if (commits === 0 && issues === 0 && prs === 0) {
+      return {
+        data: [1, 0, 0], // At least one non-zero value
+        labels: ["No Data", "Issues", "Pull Requests"],
+        colors: ["#cccccc", "#2e7d32", "#9c27b0"],
+      };
+    }
+    
     return {
-      data: [
-        currentCourse.stats.github.totalCommits,
-        currentCourse.stats.github.totalIssues,
-        currentCourse.stats.github.totalPRs
-      ],
+      data: [commits, issues, prs],
       labels: ["Commits", "Issues", "Pull Requests"],
       colors: ["#1976d2", "#2e7d32", "#9c27b0"],
     };
@@ -264,10 +273,23 @@ export default function Dashboard() {
 
   // Generate team commits data from current course
   const getTeamCommitsData = () => {
-    if (!currentCourse) return { labels: [], datasets: [{ data: [], label: "Total Commits" }] };
+    if (!currentCourse || !currentCourse.teams || currentCourse.teams.length === 0) {
+      return { 
+        labels: ["No Data"], 
+        datasets: [{ data: [0], label: "Total Commits" }] 
+      };
+    }
     
     const labels = currentCourse.teams.map(team => team.name);
-    const data = currentCourse.teams.map(team => team.gitHubStats.commits);
+    const data = currentCourse.teams.map(team => team.gitHubStats?.commits || 0);
+    
+    // Ensure we have at least one data point to prevent chart errors
+    if (labels.length === 0 || data.every(val => val === 0)) {
+      return { 
+        labels: ["No Data"], 
+        datasets: [{ data: [0], label: "Total Commits" }] 
+      };
+    }
     
     return {
       labels,
@@ -549,11 +571,13 @@ export default function Dashboard() {
                   <PieChart
                     series={[
                       {
-                        data: getActivityDistribution().data.map((value, index) => ({
-                          value,
-                          label: getActivityDistribution().labels[index],
-                          color: getActivityDistribution().colors[index],
-                        })),
+                        data: getActivityDistribution().data
+                          .map((value, index) => ({
+                            value,
+                            label: getActivityDistribution().labels[index],
+                            color: getActivityDistribution().colors[index],
+                          }))
+                          .filter(item => item.value > 0), // Only include non-zero values
                         innerRadius: 30,
                         paddingAngle: 2,
                         cornerRadius: 4,
