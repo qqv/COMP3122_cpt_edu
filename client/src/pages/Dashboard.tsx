@@ -198,28 +198,27 @@ const recentActivities = [
   },
 ];
 
-// Generate activity distribution data from current course
-const getActivityDistribution = () => {
-  if (!currentCourse) {
+export default function Dashboard() {
+  // Generate activity distribution data from current course
+  const getActivityDistribution = () => {
+    if (!currentCourse) {
+      return {
+        data: [0, 0, 0],
+        labels: ["Commits", "Issues", "Pull Requests"],
+        colors: ["#1976d2", "#2e7d32", "#9c27b0"],
+      };
+    }
+    
     return {
-      data: [0, 0, 0],
+      data: [
+        currentCourse.stats.github.totalCommits,
+        currentCourse.stats.github.totalIssues,
+        currentCourse.stats.github.totalPRs
+      ],
       labels: ["Commits", "Issues", "Pull Requests"],
       colors: ["#1976d2", "#2e7d32", "#9c27b0"],
     };
-  }
-  
-  return {
-    data: [
-      currentCourse.stats.github.totalCommits,
-      currentCourse.stats.github.totalIssues,
-      currentCourse.stats.github.totalPRs
-    ],
-    labels: ["Commits", "Issues", "Pull Requests"],
-    colors: ["#1976d2", "#2e7d32", "#9c27b0"],
   };
-};
-
-export default function Dashboard() {
   // 状态管理
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [courseStats, setCourseStats] = useState<any[]>([]);
