@@ -568,58 +568,54 @@ export default function Dashboard() {
                         <ListItemAvatar>
                           <Avatar>{item.student.name.charAt(0)}</Avatar>
                         </ListItemAvatar>
-                        <ListItemText
-                          primary={
-                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                              <Typography variant="subtitle2">
-                                {item.student.name}
-                              </Typography>
-                              <Box
-                                sx={{
-                                  ml: 1,
-                                  px: 1,
-                                  py: 0.5,
-                                  borderRadius: 1,
-                                  fontSize: "0.75rem",
-                                  bgcolor: "error.100",
-                                  color: "error.700",
-                                }}
-                              >
-                                Low Activity
-                              </Box>
+                        <Box sx={{ flexGrow: 1, ml: 2 }}>
+                          <Box sx={{ display: "flex", alignItems: "center" }}>
+                            <Typography variant="subtitle2">
+                              {item.student.name}
+                            </Typography>
+                            <Box
+                              sx={{
+                                ml: 1,
+                                px: 1,
+                                py: 0.5,
+                                borderRadius: 1,
+                                fontSize: "0.75rem",
+                                bgcolor: "error.100",
+                                color: "error.700",
+                              }}
+                            >
+                              Low Activity
                             </Box>
-                          }
-                          secondary={
-                            <Box sx={{ mt: 1 }}>
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  mb: 0.5,
-                                  justifyContent: "space-between",
-                                }}
-                              >
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                >
-                                  Commits: {item.commits} /{" "}
-                                  {item.teamTotalCommits}
-                                </Typography>
-                                <Typography variant="body2" color="error.main">
-                                  {item.commitPercentage.toFixed(1)}%
-                                </Typography>
-                              </Box>
+                          </Box>
+                          <Box sx={{ mt: 1 }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                mb: 0.5,
+                                justifyContent: "space-between",
+                              }}
+                            >
                               <Typography
-                                variant="caption"
+                                variant="body2"
                                 color="text.secondary"
                               >
-                                Team: {item.team.name} • GitHub:{" "}
-                                {item.student.githubId || "Not linked"}
+                                Commits: {item.commits} /{" "}
+                                {item.teamTotalCommits}
+                              </Typography>
+                              <Typography variant="body2" color="error.main">
+                                {item.commitPercentage.toFixed(1)}%
                               </Typography>
                             </Box>
-                          }
-                        />
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Team: {item.team.name} • GitHub:{" "}
+                              {item.student.githubId || "Not linked"}
+                            </Typography>
+                          </Box>
+                        </Box>
                       </ListItem>
                     ))}
                   </List>
@@ -647,22 +643,18 @@ export default function Dashboard() {
                         <ListItemAvatar>
                           <Avatar src={commit.author.avatar} />
                         </ListItemAvatar>
-                        <ListItemText
-                          primary={
-                            <Typography variant="body2">
-                              <Box component="span" sx={{ fontWeight: 600 }}>
-                                {commit.author.name}
-                              </Box>{" "}
-                              committed: {commit.message.split("\n")[0]}
-                            </Typography>
-                          }
-                          secondary={
-                            <>
-                              {new Date(commit.author.date).toLocaleString()} •{" "}
-                              {commit.team.name}
-                            </>
-                          }
-                        />
+                        <Box sx={{ flexGrow: 1, ml: 2 }}>
+                          <Typography variant="body2">
+                            <Box component="span" sx={{ fontWeight: 600 }}>
+                              {commit.author.name}
+                            </Box>{" "}
+                            committed: {commit.message.split("\n")[0]}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(commit.author.date).toLocaleString()} •{" "}
+                            {commit.team.name}
+                          </Typography>
+                        </Box>
                       </ListItem>
                     ))}
                   </List>
