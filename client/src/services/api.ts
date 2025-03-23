@@ -181,6 +181,16 @@ export const courseService = {
     }
   },
   
+  getAllCourseStats: async () => {
+    try {
+      const { data } = await api.get('/course-stats/all');
+      return data;
+    } catch (error) {
+      console.error('Error fetching course stats:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch course statistics');
+    }
+  },
+  
   getCourseById: async (id) => {
     try {
       const { data } = await api.get(`/courses/${id}`);
