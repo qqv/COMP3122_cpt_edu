@@ -33,6 +33,7 @@ interface TeamStats {
     user: any;
     contribution: any;
   }>;
+  recentCommits?: Array<any>;
 }
 // const contribution = contributors.find(
 //   (c : Contributor) => c.githubId === studentInfo?.githubId
@@ -123,6 +124,9 @@ router.get("/all", async (req, res, next) => {
                     // Get contributors data
                     const contributors =
                       await GitHubService.getRepoContributors(owner, repo);
+                      
+                    // Get recent commits
+                    const recentCommits = await GitHubService.getRecentCommits(owner, repo, 10);
 
                     // Add member details with contribution information
                     teamStats.members = team.members.map((member) => {
@@ -155,6 +159,9 @@ router.get("/all", async (req, res, next) => {
                       prs: stats.prs || 0,
                       exists: stats.exists || false,
                     };
+                    
+                    // Add recent commits to team stats
+                    teamStats.recentCommits = recentCommits;
 
                     if (stats.exists) {
                       totalCommits += stats.commits || 0;
