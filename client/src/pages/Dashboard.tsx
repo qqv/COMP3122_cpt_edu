@@ -198,42 +198,59 @@ const recentActivities = [
   },
 ];
 
-// 活动分布数据
-const activityDistribution = {
-  data: [45, 25, 15, 10, 5],
-  labels: ["Commits", "Issues", "Pull Requests", "Comments", "Reviews"],
-  colors: ["#1976d2", "#2e7d32", "#9c27b0", "#ed6c02", "#d32f2f"],
+// Generate activity distribution data from current course
+const getActivityDistribution = () => {
+  if (!currentCourse) {
+    return {
+      data: [0, 0, 0],
+      labels: ["Commits", "Issues", "Pull Requests"],
+      colors: ["#1976d2", "#2e7d32", "#9c27b0"],
+    };
+  }
+  
+  return {
+    data: [
+      currentCourse.stats.github.totalCommits,
+      currentCourse.stats.github.totalIssues,
+      currentCourse.stats.github.totalPRs
+    ],
+    labels: ["Commits", "Issues", "Pull Requests"],
+    colors: ["#1976d2", "#2e7d32", "#9c27b0"],
+  };
 };
 
 export default function Dashboard() {
   // 状态管理
-  const [selectedCourse, setSelectedCourse] = useState("");
-  const [courseStats, setCourseStats] = useState([]);
+  const [selectedCourseId, setSelectedCourseId] = useState("");
+  const [courseStats, setCourseStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // 处理课程变更
   const handleCourseChange = (event) => {
-    setSelectedCourse(event.target.value);
+    setSelectedCourseId(event.target.value);
   };
 
   // 获取当前选中的课程
-  const currentCourse = courses.find((course) => course.id === selectedCourse) || courses[0];
+  const currentCourse = courseStats.find((course) => course._id === selectedCourseId);
   
   // 获取所有课程统计数据
   const fetchCourseStats = async () => {
     try {
       setLoading(true);
-      const data = await courseService.getAllCourseStats();
-      setCourseStats(data);
-      console.log("Course stats fetched:", data);
-      setError(null);
-      
-      // If there are courses in the response, select the first one
-      if (data && data.length > 0) {
-        setSelectedCourse(data[0]._id);
+      const response = await courseService.getAllCourseStats();
+      if (response && response.courses) {
+        setCourseStats(response.courses);
+        console.log("Course stats fetched:", response.courses);
+        
+        // If there are courses in the response, select the first one
+        if (response.courses.length > 0) {
+          setSelectedCourseId(response.courses[0]._id);
+        }
+      } else {
+        setError('Invalid response format');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching course stats:", err);
       setError(err.message || 'Failed to fetch course statistics');
     } finally {
@@ -246,15 +263,22 @@ export default function Dashboard() {
     fetchCourseStats();
   }, []);
 
-  // 图表数据 - Team Commits Comparison
-  const teamCommitsData = {
-    labels: ["Team Alpha", "Team Beta", "Team Gamma", "Team Delta", "Team Epsilon"],
-    datasets: [
-      {
-        data: [142, 98, 165, 87, 32],
-        label: "Total Commits",
-      }
-    ],
+  // Generate team commits data from current course
+  const getTeamCommitsData = () => {
+    if (!currentCourse) return { labels: [], datasets: [{ data: [], label: "Total Commits" }] };
+    
+    const labels = currentCourse.teams.map(team => team.name);
+    const data = currentCourse.teams.map(team => team.gitHubStats.commits);
+    
+    return {
+      labels,
+      datasets: [
+        {
+          data,
+          label: "Total Commits",
+        }
+      ],
+    };
   };
   
   // Sample low active students data
@@ -319,23 +343,30 @@ export default function Dashboard() {
                 alignItems: "center",
               }}
             >
-              <Stack direction="row" spacing={2} alignItems="center">
-                <IconButton sx={{ display: { sm: "none" } }}>
-                  <MenuIcon />
-                </IconButton>
-                <Typography variant="h5" component="h1">
-                  {currentCourse.id} - {currentCourse.name}
-                </Typography>
-              </Stack>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Typography variant="body2" color="text.secondary">
-                  {currentCourse.instructor}
-                </Typography>
-                <Avatar>
-                  {currentCourse.instructor.split(" ")[0][0]}
-                  {currentCourse.instructor.split(" ")[1][0]}
-                </Avatar>
-              </Stack>
+              {currentCourse && (
+                <>
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <IconButton sx={{ display: { sm: "none" } }}>
+                      <MenuIcon />
+                    </IconButton>
+                    <Typography variant="h5" component="h1">
+                      {currentCourse.code} - {currentCourse.name}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <Typography variant="body2" color="text.secondary">
+                      {currentCourse.teachers && currentCourse.teachers.length > 0 
+                        ? currentCourse.teachers[0].name 
+                        : 'No instructor assigned'}
+                    </Typography>
+                    <Avatar>
+                      {currentCourse.teachers && currentCourse.teachers.length > 0 
+                        ? `${currentCourse.teachers[0].name.split(",")[0][0]}${currentCourse.teachers[0].name.split(",")[1] ? currentCourse.teachers[0].name.split(",")[1][1] : ''}`
+                        : 'NA'}
+                    </Avatar>
+                  </Stack>
+                </>
+              )}
             </Box>
             <Divider sx={{ my: 2 }} />
             <Box
@@ -345,33 +376,35 @@ export default function Dashboard() {
                 alignItems: "center",
               }}
             >
-              <Stack direction="row" spacing={3}>
-                <Typography variant="body2" color="text.secondary">
-                  Course Project: {currentCourse.project}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Groups: {currentCourse.groups}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Students: {currentCourse.students}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Deadline: {currentCourse.deadline}
-                </Typography>
-              </Stack>
+              {currentCourse && (
+                <Stack direction="row" spacing={3}>
+                  <Typography variant="body2" color="text.secondary">
+                    Course Code: {currentCourse.code}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Teams: {currentCourse.stats.teams}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Students: {currentCourse.stats.students}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Status: {currentCourse.status}
+                  </Typography>
+                </Stack>
+              )}
               <FormControl sx={{ minWidth: 200 }}>
                 <InputLabel id="course-select-label">Select Course</InputLabel>
                 <Select
                   labelId="course-select-label"
                   id="course-select"
-                  value={selectedCourse}
+                  value={selectedCourseId}
                   label="Select Course"
                   onChange={handleCourseChange}
                   size="small"
                 >
-                  {courses.map((course) => (
-                    <MenuItem key={course.id} value={course.id}>
-                      {course.id} - {course.name}
+                  {courseStats.map((course) => (
+                    <MenuItem key={course._id} value={course._id}>
+                      {course.code} - {course.name}
                     </MenuItem>
                   ))}
                 </Select>
@@ -405,7 +438,7 @@ export default function Dashboard() {
                         Total Commits
                       </Typography>
                       <Typography variant="h5" component="div">
-                        892
+                        {currentCourse ? currentCourse.stats.github.totalCommits : 0}
                       </Typography>
                     </Box>
                   </Stack>
@@ -426,7 +459,7 @@ export default function Dashboard() {
                         Issues Closed
                       </Typography>
                       <Typography variant="h5" component="div">
-                        156
+                        {currentCourse ? currentCourse.stats.github.totalIssues : 0}
                       </Typography>
                     </Box>
                   </Stack>
@@ -447,7 +480,7 @@ export default function Dashboard() {
                         Pull Requests
                       </Typography>
                       <Typography variant="h5" component="div">
-                        78
+                        {currentCourse ? currentCourse.stats.github.totalPRs : 0}
                       </Typography>
                     </Box>
                   </Stack>
@@ -468,7 +501,7 @@ export default function Dashboard() {
                         Teams at Risk
                       </Typography>
                       <Typography variant="h5" component="div">
-                        2
+                        {currentCourse ? currentCourse.lowActiveStudents?.length || 0 : 0}
                       </Typography>
                     </Box>
                   </Stack>
@@ -486,8 +519,8 @@ export default function Dashboard() {
                 </Typography>
                 <Box sx={{ height: 300, pt: 2 }}>
                   <BarChart
-                    series={teamCommitsData.datasets}
-                    xAxis={[{ data: teamCommitsData.labels, scaleType: "band" }]}
+                    series={getTeamCommitsData().datasets}
+                    xAxis={[{ data: getTeamCommitsData().labels, scaleType: "band" }]}
                     height={250}
                     colors={['#1976d2']}
                     slotProps={{
@@ -517,10 +550,10 @@ export default function Dashboard() {
                   <PieChart
                     series={[
                       {
-                        data: activityDistribution.data.map((value, index) => ({
+                        data: getActivityDistribution().data.map((value, index) => ({
                           value,
-                          label: activityDistribution.labels[index],
-                          color: activityDistribution.colors[index],
+                          label: getActivityDistribution().labels[index],
+                          color: getActivityDistribution().colors[index],
                         })),
                         innerRadius: 30,
                         paddingAngle: 2,
@@ -567,16 +600,33 @@ export default function Dashboard() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {teams.map((team) => (
-                    <TableRow key={team.name}>
-                      <TableCell>{team.name}</TableCell>
-                      <TableCell>{team.members}</TableCell>
-                      <TableCell>{team.commits}</TableCell>
-                      <TableCell>{team.issues}</TableCell>
-                      <TableCell>{team.prs}</TableCell>
-                      <TableCell>{team.lastActivity}</TableCell>
-                    </TableRow>
-                  ))}
+                  {currentCourse?.teams.map((team) => {
+                    // Get the most recent commit for this team
+                    const lastActivity = team.recentCommits && team.recentCommits.length > 0 
+                      ? new Date(team.recentCommits[0].author.date)
+                      : null;
+                      
+                    // Format the last activity date
+                    const formattedLastActivity = lastActivity 
+                      ? lastActivity.toLocaleString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                      : 'No activity';
+                      
+                    return (
+                      <TableRow key={team._id}>
+                        <TableCell>{team.name}</TableCell>
+                        <TableCell>{team.memberCount}</TableCell>
+                        <TableCell>{team.gitHubStats.commits}</TableCell>
+                        <TableCell>{team.gitHubStats.issues}</TableCell>
+                        <TableCell>{team.gitHubStats.prs}</TableCell>
+                        <TableCell>{formattedLastActivity}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </Box>
@@ -600,7 +650,7 @@ export default function Dashboard() {
                   </Typography>
                 </Box>
                 <List sx={{ overflow: "auto", maxHeight: 520 }}>
-                  {lowActiveStudents.map((item) => (
+                  {currentCourse?.lowActiveStudents?.map((item) => (
                     <ListItem key={item.student._id}>
                       <ListItemAvatar>
                         <Avatar>{item.student.name.charAt(0)}</Avatar>
@@ -674,21 +724,25 @@ export default function Dashboard() {
                   </Typography>
                 </Box>
                 <List sx={{ overflow: "auto", maxHeight: 520 }}>
-                  {recentActivities.map((activity, index) => (
+                  {currentCourse?.recentCommits?.map((commit, index) => (
                     <ListItem key={index}>
                       <ListItemAvatar>
-                        <Avatar src={activity.avatar} />
+                        <Avatar src={commit.author.avatar} />
                       </ListItemAvatar>
                       <ListItemText
                         primary={
                           <Typography variant="body2">
                             <Box component="span" sx={{ fontWeight: 600 }}>
-                              {activity.user}
+                              {commit.author.name}
                             </Box>{" "}
-                            {activity.action}
+                            committed: {commit.message.split('\n')[0]}
                           </Typography>
                         }
-                        secondary={activity.time}
+                        secondary={
+                          <>
+                            {new Date(commit.author.date).toLocaleString()} • {commit.team.name}
+                          </>
+                        }
                       />
                     </ListItem>
                   ))}
