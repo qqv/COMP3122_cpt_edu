@@ -30,7 +30,6 @@ import {
   Code as CodeIcon,
   MergeType as MergeTypeIcon,
   BugReport as BugReportIcon,
-  TrendingUp as TrendingUpIcon,
   Warning as WarningIcon,
   Menu as MenuIcon,
 } from "@mui/icons-material";
@@ -367,14 +366,6 @@ export default function Dashboard() {
                       <Typography variant="h5" component="div">
                         892
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        color="success.main"
-                        sx={{ display: "flex", alignItems: "center" }}
-                      >
-                        <TrendingUpIcon fontSize="small" sx={{ mr: 0.5 }} />
-                        +15% from last week
-                      </Typography>
                     </Box>
                   </Stack>
                 </CardContent>
@@ -395,14 +386,6 @@ export default function Dashboard() {
                       </Typography>
                       <Typography variant="h5" component="div">
                         156
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        color="success.main"
-                        sx={{ display: "flex", alignItems: "center" }}
-                      >
-                        <TrendingUpIcon fontSize="small" sx={{ mr: 0.5 }} />
-                        +8% from last week
                       </Typography>
                     </Box>
                   </Stack>
@@ -425,14 +408,6 @@ export default function Dashboard() {
                       <Typography variant="h5" component="div">
                         78
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        color="success.main"
-                        sx={{ display: "flex", alignItems: "center" }}
-                      >
-                        <TrendingUpIcon fontSize="small" sx={{ mr: 0.5 }} />
-                        +12% from last week
-                      </Typography>
                     </Box>
                   </Stack>
                 </CardContent>
@@ -453,13 +428,6 @@ export default function Dashboard() {
                       </Typography>
                       <Typography variant="h5" component="div">
                         2
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        color="error.main"
-                        sx={{ display: "flex", alignItems: "center" }}
-                      >
-                        1 with low activity
                       </Typography>
                     </Box>
                   </Stack>
