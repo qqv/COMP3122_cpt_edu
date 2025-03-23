@@ -35,6 +35,31 @@ interface TeamStats {
   }>;
   recentCommits?: Array<any>;
 }
+
+// Define the course stats interface
+interface CourseWithStats {
+  _id: any;
+  name: string;
+  code: string;
+  description?: string;
+  teachers: any[];
+  startDate?: Date;
+  endDate?: Date;
+  status: string;
+  createdAt: Date;
+  stats: {
+    teams: number;
+    students: number;
+    github: {
+      totalCommits: number;
+      totalIssues: number;
+      totalPRs: number;
+      activeRepos: number;
+    };
+  };
+  teams: TeamStats[];
+  recentCommits?: Array<any>;
+}
 // const contribution = contributors.find(
 //   (c : Contributor) => c.githubId === studentInfo?.githubId
 // ) || {
@@ -88,6 +113,9 @@ router.get("/all", async (req, res, next) => {
         let totalIssues = 0;
         let totalPRs = 0;
         let activeRepos = 0;
+        
+        // Array to collect all recent commits across teams in this course
+        let allCourseCommits: any[] = [];
 
         // Process teams with GitHub stats
         const teamsWithStats = await Promise.all(
@@ -162,6 +190,21 @@ router.get("/all", async (req, res, next) => {
                     
                     // Add recent commits to team stats
                     teamStats.recentCommits = recentCommits;
+                    
+                    // Add these commits to the course's collection with team info
+                    if (recentCommits && recentCommits.length > 0) {
+                      // Add team information to each commit
+                      const commitsWithTeamInfo = recentCommits.map(commit => ({
+                        ...commit,
+                        team: {
+                          id: team._id,
+                          name: team.name
+                        }
+                      }));
+                      
+                      // Add to the course's collection
+                      allCourseCommits = [...allCourseCommits, ...commitsWithTeamInfo];
+                    }
 
                     if (stats.exists) {
                       totalCommits += stats.commits || 0;
@@ -189,6 +232,16 @@ router.get("/all", async (req, res, next) => {
           })
         );
 
+        // Sort all commits by date (newest first)
+        allCourseCommits.sort((a, b) => {
+          const dateA = new Date(a.author.date).getTime();
+          const dateB = new Date(b.author.date).getTime();
+          return dateB - dateA; // Sort in descending order (newest first)
+        });
+        
+        // Limit to most recent 20 commits for the course overview
+        const recentCourseCommits = allCourseCommits.slice(0, 20);
+        
         return {
           ...course,
           stats: {
@@ -203,6 +256,8 @@ router.get("/all", async (req, res, next) => {
           },
           // Add the teams with GitHub stats for this course to the response
           teams: teamsWithStats,
+          // Add recent commits for the entire course
+          recentCommits: recentCourseCommits,
         };
       })
     );
