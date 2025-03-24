@@ -352,7 +352,7 @@ export default function Dashboard() {
                       </Box>
                       <Box>
                         <Typography color="text.secondary" variant="body2">
-                          Teams at Risk
+                          Student at Risks
                         </Typography>
                         <Typography variant="h5" component="div">
                           {currentCourse
