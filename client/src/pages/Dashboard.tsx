@@ -152,46 +152,6 @@ export default function Dashboard() {
     };
   };
 
-  // Sample low active students data
-  const lowActiveStudents = [
-    {
-      student: {
-        _id: "67d7cb2cdd317c59555c3084",
-        name: "Master, Real",
-        email: "sarah.wong@example.com",
-        githubId: "Chris12420",
-        __v: 0,
-        createdAt: "2025-03-17T07:11:40.306Z",
-        updatedAt: "2025-03-17T07:11:40.306Z",
-      },
-      team: {
-        id: "67d7cb2cdd317c59555c308e",
-        name: "Team Alpha",
-      },
-      commitPercentage: 0,
-      commits: 0,
-      teamTotalCommits: 50,
-    },
-    {
-      student: {
-        _id: "67d7cb2cdd317c59555c3086",
-        name: "Master, AI",
-        email: "emily.chen@example.com",
-        githubId: "lyxsq99",
-        __v: 0,
-        createdAt: "2025-03-17T07:11:40.306Z",
-        updatedAt: "2025-03-17T07:11:40.306Z",
-      },
-      team: {
-        id: "67d7cb2cdd317c59555c308e",
-        name: "Team Alpha",
-      },
-      commitPercentage: 0,
-      commits: 0,
-      teamTotalCommits: 50,
-    },
-  ];
-
   return (
     <Box sx={{ display: "flex" }}>
       <Sidebar />
@@ -559,7 +519,7 @@ export default function Dashboard() {
                     <Typography variant="h6">Low Active Students</Typography>
                     <Typography variant="body2" color="text.secondary">
                       Students with &lt;5% Contribution (
-                      {lowActiveStudents.length})
+                      {currentCourse?.lowActiveStudents?.length})
                     </Typography>
                   </Box>
                   <List sx={{ overflow: "auto", maxHeight: 520 }}>
