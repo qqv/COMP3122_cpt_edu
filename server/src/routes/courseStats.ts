@@ -106,7 +106,7 @@ router.get("/all", async (req, res, next) => {
           (team) =>
             team.course && team.course.toString() === course._id.toString()
         );
-
+        console.log(courseTeams);
         // Calculate the number of teams
         const teamsCount = courseTeams.length;
 
@@ -114,7 +114,7 @@ router.get("/all", async (req, res, next) => {
         const uniqueStudentIds = new Set();
         courseTeams.forEach((team) => {
           team.members.forEach((member) => {
-            uniqueStudentIds.add(member.userId.toString());
+            uniqueStudentIds.add(member.userId);
           });
         });
 
@@ -123,10 +123,10 @@ router.get("/all", async (req, res, next) => {
         let totalIssues = 0;
         let totalPRs = 0;
         let activeRepos = 0;
-        
+
         // Array to collect all recent commits across teams in this course
         let allCourseCommits: any[] = [];
-        
+
         // Array to collect low active students
         let lowActiveStudents: Array<{
           student: any;
@@ -174,15 +174,20 @@ router.get("/all", async (req, res, next) => {
                     // Get contributors data
                     const contributors =
                       await GitHubService.getRepoContributors(owner, repo);
-                      
+
                     // Get recent commits
-                    const recentCommits = await GitHubService.getRecentCommits(owner, repo, 10);
+                    const recentCommits = await GitHubService.getRecentCommits(
+                      owner,
+                      repo,
+                      10
+                    );
 
                     // Calculate total team commits
                     const teamTotalCommits = contributors.reduce(
-                      (total, contributor) => total + contributor.commits, 0
+                      (total, contributor) => total + contributor.commits,
+                      0
                     );
-                    
+
                     // Add member details with contribution information
                     teamStats.members = team.members.map((member) => {
                       const userId = member.userId._id
@@ -199,23 +204,28 @@ router.get("/all", async (req, res, next) => {
                         deletions: 0,
                         lastCommit: null,
                       };
-                      
+
                       // Calculate commit percentage for this student
-                      const commitPercentage = teamTotalCommits > 0 
-                        ? (contribution.commits / teamTotalCommits) * 100 
-                        : 0;
-                        
+                      const commitPercentage =
+                        teamTotalCommits > 0
+                          ? (contribution.commits / teamTotalCommits) * 100
+                          : 0;
+
                       // Check if this is a low active student (less than 5% of team commits)
-                      if (teamTotalCommits > 0 && commitPercentage < 5 && studentInfo) {
+                      if (
+                        teamTotalCommits > 0 &&
+                        commitPercentage < 5 &&
+                        studentInfo
+                      ) {
                         lowActiveStudents.push({
                           student: studentInfo,
                           team: {
                             id: team._id,
-                            name: team.name
+                            name: team.name,
                           },
                           commitPercentage,
                           commits: contribution.commits,
-                          teamTotalCommits
+                          teamTotalCommits,
                         });
                       }
 
@@ -224,7 +234,7 @@ router.get("/all", async (req, res, next) => {
                         role: member.role as "leader" | "member",
                         user: studentInfo,
                         contribution,
-                        commitPercentage
+                        commitPercentage,
                       };
                     });
 
@@ -234,23 +244,28 @@ router.get("/all", async (req, res, next) => {
                       prs: stats.prs || 0,
                       exists: stats.exists || false,
                     };
-                    
+
                     // Add recent commits to team stats
                     teamStats.recentCommits = recentCommits;
-                    
+
                     // Add these commits to the course's collection with team info
                     if (recentCommits && recentCommits.length > 0) {
                       // Add team information to each commit
-                      const commitsWithTeamInfo = recentCommits.map(commit => ({
-                        ...commit,
-                        team: {
-                          id: team._id,
-                          name: team.name
-                        }
-                      }));
-                      
+                      const commitsWithTeamInfo = recentCommits.map(
+                        (commit) => ({
+                          ...commit,
+                          team: {
+                            id: team._id,
+                            name: team.name,
+                          },
+                        })
+                      );
+
                       // Add to the course's collection
-                      allCourseCommits = [...allCourseCommits, ...commitsWithTeamInfo];
+                      allCourseCommits = [
+                        ...allCourseCommits,
+                        ...commitsWithTeamInfo,
+                      ];
                     }
 
                     if (stats.exists) {
@@ -285,10 +300,10 @@ router.get("/all", async (req, res, next) => {
           const dateB = new Date(b.author.date).getTime();
           return dateB - dateA; // Sort in descending order (newest first)
         });
-        
+
         // Limit to most recent 20 commits for the course overview
         const recentCourseCommits = allCourseCommits.slice(0, 20);
-        
+
         return {
           ...course,
           stats: {
