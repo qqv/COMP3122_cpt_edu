@@ -474,6 +474,47 @@ export const studentService = {
       }
       throw new Error(error.response?.data?.message || 'Failed to delete student');
     }
+  },
+  
+  updateStudent: async (id: string, studentData: { name: string; email: string; githubId: string }) => {
+    try {
+      console.log('Updating student with ID:', id, 'and data:', studentData);
+      const { data } = await api.put(`/students/${id}`, studentData);
+      console.log('Student updated successfully:', data);
+      return data;
+    } catch (error: any) {
+      console.error('Update student error:', error.response || error);
+      
+      // 處理常見的錯誤類型
+      if (error.response?.data) {
+        const responseData = error.response.data;
+        
+        // 處理重複鍵錯誤
+        if (responseData.error === 'duplicate_key') {
+          const field = responseData.field;
+          if (field === 'email') {
+            throw new Error('Email already exists');
+          } else if (field === 'githubId') {
+            throw new Error('GitHub ID already exists');
+          } else {
+            throw new Error('Student already exists');
+          }
+        }
+        
+        // 返回服務器提供的錯誤訊息
+        if (responseData.message) {
+          throw new Error(responseData.message);
+        }
+      }
+      
+      // 處理一般連接錯誤
+      if (!error.response) {
+        throw new Error('Cannot connect to server. Please ensure the backend is running.');
+      }
+      
+      // 默認錯誤訊息
+      throw new Error(error.response?.data?.message || 'Failed to update student');
+    }
   }
 };
 
