@@ -208,29 +208,14 @@ export default function Students() {
         const createdStudent = await studentService.createStudent(newStudent);
         console.log('Student created successfully:', createdStudent);
         
-        // Add student to local state immediately to show instant feedback
-        setStudents(prevStudents => [...prevStudents, createdStudent]);
-        
-        // Also refresh from server to ensure we have latest data
-        try {
-          const allStudents = await studentService.getAllStudents();
-          if (Array.isArray(allStudents)) {
-            setStudents(allStudents);
-          } else {
-            // Fallback to search
-            const { students } = await studentService.searchStudents(' ');
-            setStudents(students);
-          }
-        } catch (refreshError) {
-          console.error('Error refreshing student list:', refreshError);
-          // Continue with the locally updated state if refresh fails
-        }
-        
         // Close dialog and reset form
         handleClose();
         
         // Show success message
         showTemporaryMessage('success', `Student ${newStudent.name} added successfully`);
+        
+        // 刷新學生列表並完整獲取活動數據
+        await refreshStudentsWithActivity();
       } catch (createError: any) {
         console.error('Failed to create student:', createError);
         
@@ -383,19 +368,6 @@ export default function Students() {
         }
       }
 
-      // 刷新学生列表
-      try {
-        const allStudents = await studentService.getAllStudents();
-        if (Array.isArray(allStudents)) {
-          setStudents(allStudents);
-        } else {
-          const { students } = await studentService.searchStudents(' ');
-          setStudents(students);
-        }
-      } catch (refreshError) {
-        console.error('Error refreshing student list after batch insert:', refreshError);
-      }
-
       // 关闭对话框并清空批量数据
       handleClose();
       setCsvFile(null);
@@ -410,6 +382,9 @@ export default function Students() {
         showTemporaryMessage('error', 'Failed to add any students');
         console.error('Batch creation errors:', batchErrors);
       }
+      
+      // 刷新學生列表並完整獲取活動數據
+      await refreshStudentsWithActivity();
     } catch (err) {
       console.error('Error in batch submit:', err);
       showTemporaryMessage('error', 'An unexpected error occurred during batch processing');
@@ -444,6 +419,9 @@ export default function Students() {
       
       // 關閉對話框
       handleDeleteDialogClose();
+      
+      // 刷新學生列表並完整獲取活動數據
+      await refreshStudentsWithActivity();
     } catch (error: any) {
       console.error('Failed to delete student:', error);
       showTemporaryMessage('error', error.message || 'Failed to delete student');
@@ -503,28 +481,14 @@ export default function Students() {
         githubId: editStudent.githubId
       });
 
-      // 更新本地狀態
-      setStudents(prevStudents => 
-        prevStudents.map(student => 
-          student._id === updatedStudent._id ? {...student, ...updatedStudent} : student
-        )
-      );
-
       // 顯示成功消息
       showTemporaryMessage('success', `Student ${updatedStudent.name} updated successfully`);
       
       // 關閉對話框
       handleEditDialogClose();
 
-      // 刷新學生列表以獲取最新數據
-      try {
-        const allStudents = await studentService.getAllStudents();
-        if (Array.isArray(allStudents)) {
-          setStudents(allStudents);
-        }
-      } catch (refreshError) {
-        console.error('Error refreshing student list:', refreshError);
-      }
+      // 刷新學生列表並完整獲取活動數據
+      await refreshStudentsWithActivity();
     } catch (error: any) {
       console.error('Failed to update student:', error);
       showTemporaryMessage('error', error.message || 'Failed to update student');
@@ -533,135 +497,77 @@ export default function Students() {
     }
   };
 
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        setLoading(true)
-        console.log('Fetching students...');
-        
-        // First try to get all students directly
-        try {
-          const allStudents = await studentService.getAllStudents();
-          console.log('All students fetch response:', allStudents);
-          if (Array.isArray(allStudents)) {
-            // 获取每个学生的活动数据，使用真实GitHub数据
-            const studentsWithActivity = await Promise.all(
-              allStudents.map(async (student) => {
-                try {
-                  // 获取学生活动数据 - 真实数据或0值
-                  const activity = await studentService.getStudentActivity(student.githubId);
-                  
-                  // 计算活动级别 - 基于贡献数据
-                  const activityLevel = getActivityLevel(
-                    activity.commits || 0,
-                    activity.issues || 0,
-                    activity.pullRequests || 0,
-                    activity.comments || 0
-                  );
-                  
-                  return {
-                    ...student,
-                    team: activity.team, // 使用API返回的真实团队，可能为null
-                    activity: {
-                      ...activity,
-                      activityLevel
-                    }
-                  };
-                } catch (error) {
-                  console.error(`Error fetching activity for student ${student.name}:`, error);
-                  // 如果获取失败，使用0值
-                  return {
-                    ...student,
-                    team: null,
-                    activity: {
-                      commits: 0,
-                      issues: 0,
-                      pullRequests: 0,
-                      comments: 0,
-                      lastActive: null,
-                      activityLevel: 'unknown'
-                    }
-                  };
-                }
-              })
+  // 統一的學生數據刷新邏輯，包含活動數據獲取
+  const refreshStudentsWithActivity = async () => {
+    try {
+      setLoading(true);
+      console.log('Refreshing students with activity data...');
+      
+      // 獲取所有學生
+      const allStudents = await studentService.getAllStudents();
+      console.log('All students fetch response:', allStudents);
+      
+      if (!Array.isArray(allStudents)) {
+        throw new Error('Invalid response format when fetching students');
+      }
+      
+      // 獲取每個學生的活動數據
+      const studentsWithActivity = await Promise.all(
+        allStudents.map(async (student) => {
+          try {
+            // 獲取學生活動數據
+            const activity = await studentService.getStudentActivity(student.githubId);
+            
+            // 計算活動級別
+            const activityLevel = getActivityLevel(
+              activity.commits || 0,
+              activity.issues || 0,
+              activity.pullRequests || 0,
+              activity.comments || 0
             );
             
-            setStudents(studentsWithActivity);
-            setError(null);
-            setLoading(false);
-            return; // Exit if successful
-          }
-        } catch (directError) {
-          console.error('Direct getAllStudents failed:', directError);
-          // Continue to the fallback method
-        }
-        
-        // Fallback to search method
-        const { students } = await studentService.searchStudents(' ');
-        console.log('Fetched students via search:', students);
-        if (Array.isArray(students)) {
-          // 使用相同的方法获取学生活动数据
-          const studentsWithActivity = await Promise.all(
-            students.map(async (student) => {
-              try {
-                // 获取学生活动数据 - 真实数据或0值
-                const activity = await studentService.getStudentActivity(student.githubId);
-                
-                // 计算活动级别
-                const activityLevel = getActivityLevel(
-                  activity.commits || 0,
-                  activity.issues || 0,
-                  activity.pullRequests || 0,
-                  activity.comments || 0
-                );
-                
-                return {
-                  ...student,
-                  team: activity.team, // 使用API返回的真实团队，可能为null
-                  activity: {
-                    ...activity,
-                    activityLevel
-                  }
-                };
-              } catch (error) {
-                console.error(`Error fetching activity for student ${student.name}:`, error);
-                // 如果获取失败，使用0值
-                return {
-                  ...student,
-                  team: null,
-                  activity: {
-                    commits: 0,
-                    issues: 0,
-                    pullRequests: 0,
-                    comments: 0,
-                    lastActive: null,
-                    activityLevel: 'unknown'
-                  }
-                };
+            return {
+              ...student,
+              team: activity.team,
+              activity: {
+                ...activity,
+                activityLevel
               }
-            })
-          );
-          
-          setStudents(studentsWithActivity);
-          setError(null);
-        } else {
-          console.error('Unexpected students data format:', students);
-          setError('Invalid data format received from server');
-        }
-      } catch (err: any) {
-        console.error('Error fetching students:', err);
-        if (err.message.includes('Cannot connect to server')) {
-          setError('Cannot connect to server. Please make sure the backend server is running.');
-        } else {
-          setError(err.message || 'Failed to fetch students');
-        }
-      } finally {
-        setLoading(false)
-      }
+            };
+          } catch (error) {
+            console.error(`Error fetching activity for student ${student.name}:`, error);
+            // 如果獲取失敗，使用0值
+            return {
+              ...student,
+              team: null,
+              activity: {
+                commits: 0,
+                issues: 0,
+                pullRequests: 0,
+                comments: 0,
+                lastActive: null,
+                activityLevel: 'unknown'
+              }
+            };
+          }
+        })
+      );
+      
+      console.log('Students with activity data:', studentsWithActivity);
+      setStudents(studentsWithActivity);
+      setError(null);
+    } catch (error) {
+      console.error('Error in refreshStudentsWithActivity:', error);
+      showTemporaryMessage('error', 'Failed to refresh student data');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    fetchStudents()
-  }, [])
+  useEffect(() => {
+    // 初始加載學生數據
+    refreshStudentsWithActivity();
+  }, []);
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -771,18 +677,18 @@ export default function Students() {
                           borderBottom: '1px solid #f0f0f0',
                           '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } 
                         }}>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                               <Avatar src={getGithubAvatarUrl(student.githubId)} alt={student.name} />
-                              <Box>
-                                <Typography variant="body2" fontWeight="medium">
-                                  {student.name}
-                                </Typography>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <GitHubIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-                                  <Typography variant="caption" color="text.secondary">
+                            <Box>
+                              <Typography variant="body2" fontWeight="medium">
+                                {student.name}
+                              </Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <GitHubIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                                <Typography variant="caption" color="text.secondary">
                                     {student.githubId}
-                                  </Typography>
+                                </Typography>
                                 </Box>
                               </Box>
                               <IconButton 
@@ -792,37 +698,37 @@ export default function Students() {
                               >
                                 <MoreVertIcon fontSize="small" />
                               </IconButton>
-                            </Box>
-                          </TableCell>
+                          </Box>
+                        </TableCell>
                           <TableCell>{student.team || 'No Team'}</TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <CodeIcon fontSize="small" color="action" />
                               <Typography>{student.activity?.commits || 0}</Typography>
-                            </Box>
-                          </TableCell>
+                          </Box>
+                        </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <BugIcon fontSize="small" color="action" />
                               <Typography>{student.activity?.issues || 0}</Typography>
-                            </Box>
-                          </TableCell>
+                          </Box>
+                        </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <MergeIcon fontSize="small" color="action" />
                               <Typography>{student.activity?.pullRequests || 0}</Typography>
-                            </Box>
-                          </TableCell>
+                          </Box>
+                        </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <CommentIcon fontSize="small" color="action" />
                               <Typography>{student.activity?.comments || 0}</Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
                               label={student.activity?.activityLevel || 'unknown'} 
-                              size="small"
+                            size="small"
                               sx={{ 
                                 backgroundColor: activityLevelColors[student.activity?.activityLevel || 'unknown'],
                                 color: 'white',
@@ -835,12 +741,12 @@ export default function Students() {
                                   <TrendingDownIcon fontSize="small" sx={{ color: 'white' }} />
                                 ) : undefined
                               }
-                            />
-                          </TableCell>
+                          />
+                        </TableCell>
                           <TableCell>
                             {student.activity?.lastActive ? new Date(student.activity.lastActive).toLocaleString() : 'No Record'}
                           </TableCell>
-                        </TableRow>
+                      </TableRow>
                       ))
                     )}
                   </TableBody>
