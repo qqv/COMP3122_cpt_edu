@@ -48,7 +48,8 @@ import {
   TrendingDown as TrendingDownIcon,
   Upload as UploadIcon,
   Delete as DeleteIcon,
-  MoreVert as MoreVertIcon
+  MoreVert as MoreVertIcon,
+  Edit as EditIcon
 } from '@mui/icons-material'
 import { studentService } from '../services/api'
 import { getGithubAvatarUrl } from '../utils/github'
@@ -102,7 +103,14 @@ export default function Students() {
   const [openSingleDialog, setOpenSingleDialog] = useState(false)
   const [openBatchDialog, setOpenBatchDialog] = useState(false)
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false)
+  const [openEditDialog, setOpenEditDialog] = useState(false)
   const [newStudent, setNewStudent] = useState({
+    name: '',
+    email: '',
+    githubId: ''
+  })
+  const [editStudent, setEditStudent] = useState({
+    _id: '',
     name: '',
     email: '',
     githubId: ''
@@ -452,6 +460,77 @@ export default function Students() {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  // 處理編輯學生
+  const handleEditDialogOpen = (student: Student) => {
+    setEditStudent({
+      _id: student._id,
+      name: student.name,
+      email: student.email,
+      githubId: student.githubId
+    });
+    setOpenEditDialog(true);
+  };
+
+  const handleEditDialogClose = () => {
+    setOpenEditDialog(false);
+  };
+
+  const handleEditSubmit = async () => {
+    try {
+      setLoading(true);
+      
+      // 基本驗證
+      if (!editStudent.name || !editStudent.email || !editStudent.githubId) {
+        showTemporaryMessage('error', 'All fields are required');
+        setLoading(false);
+        return;
+      }
+
+      // 郵箱驗證
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(editStudent.email)) {
+        showTemporaryMessage('error', 'Please enter a valid email address');
+        setLoading(false);
+        return;
+      }
+
+      // 呼叫API更新學生資料
+      const updatedStudent = await studentService.updateStudent(editStudent._id, {
+        name: editStudent.name,
+        email: editStudent.email,
+        githubId: editStudent.githubId
+      });
+
+      // 更新本地狀態
+      setStudents(prevStudents => 
+        prevStudents.map(student => 
+          student._id === updatedStudent._id ? {...student, ...updatedStudent} : student
+        )
+      );
+
+      // 顯示成功消息
+      showTemporaryMessage('success', `Student ${updatedStudent.name} updated successfully`);
+      
+      // 關閉對話框
+      handleEditDialogClose();
+
+      // 刷新學生列表以獲取最新數據
+      try {
+        const allStudents = await studentService.getAllStudents();
+        if (Array.isArray(allStudents)) {
+          setStudents(allStudents);
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing student list:', refreshError);
+      }
+    } catch (error: any) {
+      console.error('Failed to update student:', error);
+      showTemporaryMessage('error', error.message || 'Failed to update student');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -908,12 +987,84 @@ export default function Students() {
       >
         <MenuItem onClick={() => {
           handleMenuClose();
+          if (selectedStudent) handleEditDialogOpen(selectedStudent);
+        }}>
+          <EditIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} />
+          Edit Student
+        </MenuItem>
+        <MenuItem onClick={() => {
+          handleMenuClose();
           if (selectedStudent) handleDeleteDialogOpen(selectedStudent);
         }} sx={{ color: 'error.main' }}>
           <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
           Delete Student
         </MenuItem>
       </Menu>
+
+      {/* 編輯學生對話框 */}
+      <Dialog open={openEditDialog} onClose={handleEditDialogClose} maxWidth="sm" fullWidth>
+        <form onSubmit={(e) => { e.preventDefault(); handleEditSubmit(); }}>
+          <DialogTitle>Edit Student</DialogTitle>
+          <DialogContent>
+            <Stack spacing={3} sx={{ mt: 2 }}>
+              <TextField
+                fullWidth
+                label="Name"
+                value={editStudent.name}
+                onChange={(e) => setEditStudent({ ...editStudent, name: e.target.value })}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PersonIcon color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <TextField
+                fullWidth
+                label="Email"
+                type="email"
+                value={editStudent.email}
+                onChange={(e) => setEditStudent({ ...editStudent, email: e.target.value })}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <EmailIcon color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <TextField
+                fullWidth
+                label="GitHub ID"
+                value={editStudent.githubId}
+                onChange={(e) => setEditStudent({ ...editStudent, githubId: e.target.value })}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <GitHubIcon color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleEditDialogClose} color="inherit" disabled={loading}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit"
+              variant="contained" 
+              color="primary"
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={20} /> : null}
+            >
+              {loading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
 
       {/* 刪除確認對話框 */}
       <Dialog open={openDeleteDialog} onClose={handleDeleteDialogClose}>
