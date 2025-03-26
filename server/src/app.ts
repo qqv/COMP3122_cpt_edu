@@ -17,6 +17,7 @@ import authRoutes from "./routes/auth";
 import settingRoutes from "./routes/setting";
 import aiRoutes from "./routes/ai";
 import courseStatsRoutes from "./routes/courseStats";
+import githubRoutes from "./routes/github";
 
 dotenv.config();
 
@@ -92,6 +93,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/settings", settingRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/course-stats", courseStatsRoutes);
+app.use("/api/github", githubRoutes);
 app.use("/api/teams/export", teamRoutes);
 
 // Error handling
