@@ -525,6 +525,30 @@ export const GitHubService = {
       return response.data.filter((issue) => !issue.pull_request);
     });
   },
+
+  /**
+   * 獲取存儲庫的所有貢獻者
+   */
+  async getRepositoryContributors(
+    owner: string,
+    repo: string
+  ): Promise<any[]> {
+    return withRetry(async () => {
+      const response = await octokit.repos.listContributors({
+        owner,
+        repo,
+        per_page: 100,
+      });
+
+      return response.data.map(contributor => ({
+        login: contributor.login,
+        id: contributor.id,
+        avatar_url: contributor.avatar_url,
+        contributions: contributor.contributions,
+        url: contributor.html_url
+      }));
+    });
+  }
 };
 
 // Validate on service startup

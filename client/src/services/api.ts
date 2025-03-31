@@ -209,12 +209,450 @@ export const teamService = {
     }
   },
 
+  getGitHubStats: async (owner: string, repo: string) => {
+    try {
+      console.log(`Fetching GitHub stats for ${owner}/${repo}`);
+      
+      // 嘗試使用後端 API 獲取
+      try {
+        const { data } = await api.get(`/github/${owner}/${repo}/stats`);
+        return { data };
+      } catch (backendError) {
+        console.log('Backend API for GitHub stats not available, falling back to direct GitHub API');
+        
+        // 使用 GitHub API 直接獲取數據
+        const headers = {
+          'Accept': 'application/vnd.github.v3+json'
+        };
+
+        // 使用 master 分支獲取提交數據
+        const commitsResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=100&sha=master`, { headers });
+        let commits = [];
+        
+        if (commitsResponse.ok) {
+          commits = await commitsResponse.json();
+        } else {
+          console.error(`GitHub API error: ${commitsResponse.status} - ${await commitsResponse.text()}`);
+        }
+
+        // 獲取 PR 數據 
+        const prsResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=100`, { headers });
+        let prs = [];
+        
+        if (prsResponse.ok) {
+          prs = await prsResponse.json();
+        } else {
+          console.error(`GitHub API error: ${prsResponse.status} - ${await prsResponse.text()}`);
+        }
+
+        // 獲取問題數據
+        const issuesResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100`, { headers });
+        let issues = [];
+        
+        if (issuesResponse.ok) {
+          issues = await issuesResponse.json();
+          // Filter out pull requests from issues
+          issues = issues.filter((issue: any) => !issue.pull_request);
+        } else {
+          console.error(`GitHub API error: ${issuesResponse.status} - ${await issuesResponse.text()}`);
+        }
+
+        // 計算月度和週度數據
+        const dateSort = (a: any, b: any) => {
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        };
+
+        // 按月分組提交
+        const commitsByMonth: number[] = [];
+        const lastSixMonths: Array<{month: number, year: number}> = [];
+        
+        for (let i = 5; i >= 0; i--) {
+          const date = new Date();
+          date.setMonth(date.getMonth() - i);
+          lastSixMonths.push({
+            month: date.getMonth(),
+            year: date.getFullYear()
+          });
+        }
+        
+        for (const monthData of lastSixMonths) {
+          const count = commits.filter((commit: any) => {
+            const commitDate = new Date(commit.commit.author.date);
+            return commitDate.getMonth() === monthData.month && 
+                  commitDate.getFullYear() === monthData.year;
+          }).length;
+          
+          commitsByMonth.push(count);
+        }
+        
+        // 按週計算最近6週的趨勢
+        const commitTrends: number[] = [];
+        const prTrends: number[] = [];
+        const issueTrends: number[] = [];
+        
+        for (let i = 5; i >= 0; i--) {
+          const endDate = new Date();
+          endDate.setHours(23, 59, 59, 999);
+          
+          const startDate = new Date();
+          startDate.setDate(startDate.getDate() - (i * 7) - 6);
+          startDate.setHours(0, 0, 0, 0);
+          
+          // 計算當前週的提交數
+          const weekCommits = commits.filter((commit: any) => {
+            const commitDate = new Date(commit.commit.author.date);
+            return commitDate >= startDate && commitDate <= endDate;
+          }).length;
+          
+          // 計算當前週的 PR 數
+          const weekPRs = prs.filter((pr: any) => {
+            const prDate = new Date(pr.created_at);
+            return prDate >= startDate && prDate <= endDate;
+          }).length;
+          
+          // 計算當前週的問題數
+          const weekIssues = issues.filter((issue: any) => {
+            const issueDate = new Date(issue.created_at);
+            return issueDate >= startDate && issueDate <= endDate;
+          }).length;
+          
+          commitTrends.push(weekCommits);
+          prTrends.push(weekPRs);
+          issueTrends.push(weekIssues);
+        }
+        
+        // 按月分組問題
+        const issuesOpened: number[] = [];
+        const issuesClosed: number[] = [];
+        
+        for (const monthData of lastSixMonths) {
+          const openedCount = issues.filter((issue: any) => {
+            const issueDate = new Date(issue.created_at);
+            return issueDate.getMonth() === monthData.month && 
+                  issueDate.getFullYear() === monthData.year;
+          }).length;
+          
+          const closedCount = issues.filter((issue: any) => {
+            if (!issue.closed_at) return false;
+            const closeDate = new Date(issue.closed_at);
+            return closeDate.getMonth() === monthData.month && 
+                  closeDate.getFullYear() === monthData.year;
+          }).length;
+          
+          issuesOpened.push(openedCount);
+          issuesClosed.push(closedCount);
+        }
+        
+        const totalCommits = commits.length;
+        const totalPRs = prs.length;
+        const totalIssues = issues.length;
+        const openIssues = issues.filter((issue: any) => issue.state === 'open').length;
+        const closedIssues = issues.filter((issue: any) => issue.state === 'closed').length;
+        
+        return {
+          data: {
+            commitsByMonth,
+            issuesOpened,
+            issuesClosed,
+            commitTrends,
+            prTrends,
+            issueTrends,
+            totalCommits,
+            totalPRs,
+            totalIssues,
+            openIssues,
+            closedIssues
+          }
+        };
+      }
+    } catch (error) {
+      console.error('Error in getGitHubStats:', error);
+      return {
+        data: {
+          commitsByMonth: [],
+          issuesOpened: [],
+          issuesClosed: [],
+          commitTrends: [],
+          prTrends: [],
+          issueTrends: [],
+          totalCommits: 0,
+          totalPRs: 0,
+          totalIssues: 0,
+          openIssues: 0,
+          closedIssues: 0
+        }
+      };
+    }
+  },
+
   exportTeams: async (teamIds: string[]) => {
     try {
       const { data } = await api.post('/teams/export', { teamIds });
       return data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to export teams');
+    }
+  },
+
+  getRepoContributors: async (owner: string, repo: string) => {
+    try {
+      // 嘗試使用後端 API 獲取
+      try {
+        const { data } = await api.get(`/analytics/github/${owner}/${repo}/contributors`);
+        return data;
+      } catch (error) {
+        console.log('Backend API for contributors not available, falling back to direct GitHub API');
+        
+        // 使用 GitHub API 直接獲取貢獻者
+        const headers = {
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28'
+        };
+        
+        const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contributors?per_page=100`, { headers });
+        const contributors = await response.json();
+        
+        if (Array.isArray(contributors)) {
+          return contributors.map(contributor => ({
+            login: contributor.login,
+            id: contributor.id,
+            avatar_url: contributor.avatar_url,
+            contributions: contributor.contributions,
+            url: contributor.html_url
+          }));
+        }
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching repository contributors:', error);
+      return [];
+    }
+  },
+  
+  getRepoParticipation: async (owner: string, repo: string) => {
+    try {
+      console.log(`Fetching GitHub participation stats for ${owner}/${repo}`);
+      
+      // 使用 GitHub API 直接獲取參與統計數據
+      const headers = {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': 'Bearer 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',
+        'X-GitHub-Api-Version': '2022-11-28'
+      };
+      
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/stats/participation`, { headers });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Participation data:", data);
+        return data;
+      } else {
+        console.error(`GitHub API error: ${response.status} - ${await response.text()}`);
+        // 返回空數據結構
+        return {
+          all: Array(52).fill(0),
+          owner: Array(52).fill(0)
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching participation data:', error);
+      return {
+        all: Array(52).fill(0),
+        owner: Array(52).fill(0)
+      };
+    }
+  },
+  
+  getRepoPullRequests: async (owner: string, repo: string) => {
+    try {
+      console.log(`Fetching GitHub pull requests for ${owner}/${repo}`);
+      
+      // 使用 GitHub API 直接獲取 PR 數據
+      const headers = {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': 'Bearer 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',
+        'X-GitHub-Api-Version': '2022-11-28'
+      };
+      
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=100`, { headers });
+      
+      if (response.ok) {
+        const pullRequests = await response.json();
+        console.log("Pull Requests data:", pullRequests);
+        
+        // 統計每個貢獻者的 PR 數量
+        interface ContributorStat {
+          login: string;
+          id: number;
+          avatar_url: string;
+          total_prs: number;
+          open_prs: number;
+          closed_prs: number;
+          merged_prs: number;
+          url: string;
+        }
+        
+        const contributorStats: Record<string, ContributorStat> = {};
+        
+        for (const pr of pullRequests) {
+          const username = pr.user.login;
+          
+          if (!contributorStats[username]) {
+            contributorStats[username] = {
+              login: username,
+              id: pr.user.id,
+              avatar_url: pr.user.avatar_url,
+              total_prs: 0,
+              open_prs: 0,
+              closed_prs: 0,
+              merged_prs: 0,
+              url: pr.user.html_url
+            };
+          }
+          
+          contributorStats[username].total_prs++;
+          
+          if (pr.state === 'open') {
+            contributorStats[username].open_prs++;
+          } else if (pr.merged_at) {
+            contributorStats[username].merged_prs++;
+          } else {
+            contributorStats[username].closed_prs++;
+          }
+        }
+        
+        // 轉換成數組並排序
+        const contributorsArray = Object.values(contributorStats);
+        contributorsArray.sort((a: ContributorStat, b: ContributorStat) => b.total_prs - a.total_prs);
+        
+        return {
+          pullRequests,
+          contributorsStats: contributorsArray,
+          totalCount: pullRequests.length,
+          openCount: pullRequests.filter(pr => pr.state === 'open').length,
+          closedCount: pullRequests.filter(pr => pr.state === 'closed' && !pr.merged_at).length,
+          mergedCount: pullRequests.filter(pr => pr.merged_at).length
+        };
+      } else {
+        console.error(`GitHub API error: ${response.status} - ${await response.text()}`);
+        return {
+          pullRequests: [],
+          contributorsStats: [],
+          totalCount: 0,
+          openCount: 0,
+          closedCount: 0,
+          mergedCount: 0
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching repository pull requests:', error);
+      return {
+        pullRequests: [],
+        contributorsStats: [],
+        totalCount: 0,
+        openCount: 0,
+        closedCount: 0,
+        mergedCount: 0
+      };
+    }
+  },
+  
+  getRepoIssues: async (owner: string, repo: string) => {
+    try {
+      console.log(`Fetching GitHub issues for ${owner}/${repo}`);
+      
+      // 使用 GitHub API 直接獲取 Issues 數據
+      const headers = {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': 'Bearer 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',
+        'X-GitHub-Api-Version': '2022-11-28'
+      };
+      
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100`, { headers });
+      
+      if (response.ok) {
+        const allIssues = await response.json();
+        
+        // 過濾掉 Pull Requests (GitHub API 中 Issues 包含 PRs)
+        const issues = allIssues.filter((issue: any) => !issue.pull_request);
+        console.log("Issues data:", issues);
+        
+        // 統計每個貢獻者的 Issues 數量
+        interface IssueContributorStat {
+          login: string;
+          id: number;
+          avatar_url: string;
+          total_issues: number;
+          open_issues: number;
+          closed_issues: number;
+          url: string;
+          // 添加統計評論數量
+          comments_count: number;
+        }
+        
+        const contributorStats: Record<string, IssueContributorStat> = {};
+        
+        // 獲取和處理 Issues
+        for (const issue of issues) {
+          const username = issue.user.login;
+          
+          if (!contributorStats[username]) {
+            contributorStats[username] = {
+              login: username,
+              id: issue.user.id,
+              avatar_url: issue.user.avatar_url,
+              total_issues: 0,
+              open_issues: 0,
+              closed_issues: 0,
+              comments_count: 0,
+              url: issue.user.html_url
+            };
+          }
+          
+          contributorStats[username].total_issues++;
+          
+          if (issue.state === 'open') {
+            contributorStats[username].open_issues++;
+          } else {
+            contributorStats[username].closed_issues++;
+          }
+          
+          // 計算評論數量
+          contributorStats[username].comments_count += issue.comments || 0;
+        }
+        
+        // 轉換成數組並排序
+        const contributorsArray = Object.values(contributorStats);
+        contributorsArray.sort((a: IssueContributorStat, b: IssueContributorStat) => 
+          b.total_issues - a.total_issues || b.comments_count - a.comments_count
+        );
+        
+        return {
+          issues,
+          contributorsStats: contributorsArray,
+          totalCount: issues.length,
+          openCount: issues.filter((issue: any) => issue.state === 'open').length,
+          closedCount: issues.filter((issue: any) => issue.state === 'closed').length
+        };
+      } else {
+        console.error(`GitHub API error: ${response.status} - ${await response.text()}`);
+        return {
+          issues: [],
+          contributorsStats: [],
+          totalCount: 0,
+          openCount: 0,
+          closedCount: 0
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching repository issues:', error);
+      return {
+        issues: [],
+        contributorsStats: [],
+        totalCount: 0,
+        openCount: 0,
+        closedCount: 0
+      };
     }
   }
 }
