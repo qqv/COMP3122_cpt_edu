@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import {
@@ -44,7 +44,10 @@ import {
   DialogContent,
   DialogContentText,
   TextField,
-  DialogActions
+  DialogActions,
+  useTheme,
+  FormControlLabel,
+  Switch
 } from '@mui/material'
 import { 
   LineChart,
@@ -1693,12 +1696,23 @@ export default function Analytics() {
       
       try {
         const { owner, repo } = extractRepoInfo(repositoryUrl);
+        
         if (!owner || !repo) {
-          throw new Error('Invalid repository URL format');
+          console.error(`Invalid repository URL format: ${repositoryUrl}`);
+          throw new Error('Cannot parse repository URL. Please check the format (should be https://github.com/owner/repo).');
         }
         
-        // 使用 API 服務獲取參與數據
+        console.log(`Fetching participation data for ${owner}/${repo}`);
+        
+        // 從 teamService 獲取數據
         const data = await teamService.getRepoParticipation(owner, repo);
+        
+        // 檢查返回的數據格式是否正確
+        if (!data || !Array.isArray(data.all) || !Array.isArray(data.owner)) {
+          throw new Error('Invalid data format returned from API');
+        }
+        
+        console.log(`Received participation data for ${owner}/${repo}:`, data);
         setParticipationData(data);
         setLoading(false);
       } catch (error: any) {
@@ -1708,12 +1722,26 @@ export default function Analytics() {
       }
     };
     
+    // 使用 useCallback 包裝 fetchData 以避免無限循環
+    const fetchDataCallback = useCallback(fetchData, [repositoryUrl, extractRepoInfo]);
+    
     useEffect(() => {
-      fetchData();
+      console.log(`ParticipationChart: Repository URL changed to ${repositoryUrl}`);
+      
+      // 每次 URL 變化時重置數據
+      setParticipationData({ all: Array(52).fill(0), owner: Array(52).fill(0) });
+      
+      if (!repositoryUrl) {
+        setError('No repository URL provided');
+        setLoading(false);
+        return;
+      }
+      
+      fetchDataCallback();
       
       // 監聽刷新事件
       const handleRefresh = (e: CustomEvent) => {
-        fetchData();
+        fetchDataCallback();
       };
       
       window.addEventListener('refresh-participation-data', handleRefresh as EventListener);
@@ -1721,7 +1749,7 @@ export default function Analytics() {
       return () => {
         window.removeEventListener('refresh-participation-data', handleRefresh as EventListener);
       };
-    }, [repositoryUrl]);
+    }, [repositoryUrl, extractRepoInfo, fetchDataCallback]);
     
     // 生成週標籤
     const generateWeekLabels = (count: number): string[] => {
@@ -2817,6 +2845,428 @@ export default function Analytics() {
     );
   };
 
+  // Commit Heatmap Chart 組件
+  const CommitHeatmapChart: React.FC<{
+    repositoryUrl: string | undefined;
+    extractRepoInfo: (url: string | undefined) => { owner: string; repo: string };
+  }> = ({ repositoryUrl, extractRepoInfo }) => {
+    const [commitData, setCommitData] = useState<{
+      dates: string[],
+      counts: number[],
+      authors: Record<string, Array<{name: string, avatar: string, count: number}>>
+    }>({ dates: [], counts: [], authors: {} });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [timeRange, setTimeRange] = useState<'week' | 'twoWeeks' | 'month' | 'threeMonths' | 'sixMonths' | 'year' | 'tenYears'>('month');
+    const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [showOnlyCommitDays, setShowOnlyCommitDays] = useState(false);
+    
+    // 獲取指定時間範圍內的時間
+    const getDateRange = (): { startDate: Date, endDate: Date } => {
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      switch (timeRange) {
+        case 'week':
+          startDate.setDate(endDate.getDate() - 7);
+          break;
+        case 'twoWeeks':
+          startDate.setDate(endDate.getDate() - 14);
+          break;
+        case 'threeMonths':
+          startDate.setMonth(endDate.getMonth() - 3);
+          break;
+        case 'sixMonths':
+          startDate.setMonth(endDate.getMonth() - 6);
+          break;
+        case 'year':
+          startDate.setFullYear(endDate.getFullYear() - 1);
+          break;
+        case 'tenYears':
+          startDate.setFullYear(endDate.getFullYear() - 10);
+          break;
+        case 'month':
+        default:
+          startDate.setMonth(endDate.getMonth() - 1);
+          break;
+      }
+      
+      return { startDate, endDate };
+    };
+    
+    const formatDate = (date: Date): string => {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    };
+    
+    const fetchCommitData = async () => {
+      if (!repositoryUrl) {
+        setError('No repository URL provided');
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const { owner, repo } = extractRepoInfo(repositoryUrl);
+        
+        if (!owner || !repo) {
+          console.error(`Invalid repository URL format: ${repositoryUrl}`);
+          throw new Error('Cannot parse repository URL. Please check the format.');
+        }
+        
+        console.log(`Fetching commit data for ${owner}/${repo}`);
+        
+        // 獲取 GitHub token
+        const token = localStorage.getItem('github_token') || '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';
+        
+        // 獲取日期範圍
+        const { startDate, endDate } = getDateRange();
+        const since = formatDate(startDate);
+        const until = formatDate(endDate);
+        
+        // 直接從 GitHub API 獲取提交數據
+        const response = await fetch(
+          `https://api.github.com/repos/${owner}/${repo}/commits?since=${since}T00:00:00Z&until=${until}T23:59:59Z&per_page=100`,
+          {
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': `Bearer ${token}`,
+              'X-GitHub-Api-Version': '2022-11-28'
+            }
+          }
+        );
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`GitHub API returned ${response.status}: ${errorText}`);
+        }
+        
+        const commits = await response.json();
+        console.log(`Received ${commits.length} commits for ${owner}/${repo}`);
+        
+        // 處理提交數據，按日期分組
+        const commitsByDate: Record<string, number> = {};
+        const authorsByDate: Record<string, Array<{name: string, avatar: string, count: number}>> = {};
+        
+        // 初始化日期範圍內的所有日期 - 修復類型錯誤
+        const dateRange: string[] = [];
+        const currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+          const dateStr = formatDate(currentDate);
+          commitsByDate[dateStr] = 0;
+          authorsByDate[dateStr] = [];
+          dateRange.push(dateStr);
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
+        // 統計每日提交數和作者信息
+        commits.forEach((commit: any) => {
+          const commitDate = commit.commit.author.date.split('T')[0];
+          if (commitsByDate[commitDate] !== undefined) {
+            commitsByDate[commitDate]++;
+            
+            // 提取作者信息
+            const authorName = commit.commit.author.name || commit.author?.login || 'Unknown';
+            const authorAvatar = commit.author?.avatar_url || 'https://avatars.githubusercontent.com/u/0?v=4';
+            
+            // 檢查作者是否已存在於當日列表中
+            const existingAuthor = authorsByDate[commitDate].find(a => a.name === authorName);
+            if (existingAuthor) {
+              existingAuthor.count++;
+            } else {
+              authorsByDate[commitDate].push({
+                name: authorName,
+                avatar: authorAvatar,
+                count: 1
+              });
+            }
+          }
+        });
+        
+        // 將數據轉換為圖表所需格式
+        let dates = Object.keys(commitsByDate).sort();
+        
+        // 如果只顯示有提交的日期，則過濾掉沒有提交的日期
+        if (showOnlyCommitDays) {
+          dates = dates.filter(date => commitsByDate[date] > 0);
+        }
+        
+        const counts = dates.map(date => commitsByDate[date]);
+        
+        setCommitData({ dates, counts, authors: authorsByDate });
+        setLoading(false);
+      } catch (error: any) {
+        console.error('Error fetching commit data:', error);
+        setError(error.message || 'Failed to fetch commit data');
+        setLoading(false);
+      }
+    };
+    
+    // 包裝 fetchCommitData 以避免無限循環
+    const fetchDataCallback = useCallback(fetchCommitData, [repositoryUrl, extractRepoInfo, timeRange, showOnlyCommitDays]);
+    
+    useEffect(() => {
+      console.log(`CommitHeatmapChart: Repository URL changed to ${repositoryUrl}`);
+      
+      // 重置數據
+      setCommitData({ dates: [], counts: [], authors: {} });
+      setSelectedDate(null);
+      
+      if (!repositoryUrl) {
+        setError('No repository URL provided');
+        setLoading(false);
+        return;
+      }
+      
+      fetchDataCallback();
+      
+      // 監聽刷新事件
+      const handleRefresh = () => {
+        fetchDataCallback();
+      };
+      
+      window.addEventListener('refresh-commit-heatmap', handleRefresh);
+      
+      return () => {
+        window.removeEventListener('refresh-commit-heatmap', handleRefresh);
+      };
+    }, [repositoryUrl, extractRepoInfo, timeRange, showOnlyCommitDays, fetchDataCallback]);
+    
+    const handleRangeChange = (event: SelectChangeEvent<string>) => {
+      const newTimeRange = event.target.value as 'week' | 'twoWeeks' | 'month' | 'threeMonths' | 'sixMonths' | 'year' | 'tenYears';
+      setTimeRange(newTimeRange);
+      
+      // 當選擇長時間範圍（1年或10年）時，自動啟用「僅顯示有提交的日期」
+      if (newTimeRange === 'year' || newTimeRange === 'tenYears') {
+        setShowOnlyCommitDays(true);
+      }
+    };
+    
+    // 處理日期點擊事件
+    const handleDateClick = (date: string) => {
+      setSelectedDate(date === selectedDate ? null : date);
+    };
+    
+    // 處理顯示選項更改
+    const handleShowOnlyCommitDaysChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+      setShowOnlyCommitDays(event.target.checked);
+    };
+    
+    // 生成熱圖顏色
+    const getColor = (count: number): string => {
+      if (count === 0) return '#ebedf0';
+      if (count <= 2) return '#9be9a8';
+      if (count <= 5) return '#40c463';
+      if (count <= 10) return '#30a14e';
+      return '#216e39';
+    };
+    
+    if (loading) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+          <CircularProgress />
+        </Box>
+      );
+    }
+    
+    if (error) {
+      return (
+        <Alert severity="info" sx={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Box>
+            <AlertTitle>無法獲取提交數據</AlertTitle>
+            <Typography variant="body2">{error}</Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              請確保儲存庫 URL 有效且存在。
+            </Typography>
+          </Box>
+        </Alert>
+      );
+    }
+    
+    // 獲取一周中的天數標籤
+    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showOnlyCommitDays}
+                onChange={handleShowOnlyCommitDaysChange}
+                color="primary"
+              />
+            }
+            label="Show only days with commits"
+          />
+          
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Time Range</InputLabel>
+            <Select
+              value={timeRange}
+              label="Time Range"
+              onChange={handleRangeChange}
+            >
+              <MenuItem value="week">Last week</MenuItem>
+              <MenuItem value="twoWeeks">Last 2 weeks</MenuItem>
+              <MenuItem value="month">Last month</MenuItem>
+              <MenuItem value="threeMonths">Last 3 months</MenuItem>
+              <MenuItem value="sixMonths">Last 6 months</MenuItem>
+              <MenuItem value="year">Last year</MenuItem>
+              <MenuItem value="tenYears">Last ten years</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+        
+        <Box sx={{ minHeight: 300, overflowX: 'auto', overflowY: 'hidden' }}>
+          {commitData.dates.length === 0 ? (
+            <Alert severity="info">
+              <AlertTitle>No commit data available</AlertTitle>
+              <Typography variant="body2">
+                No commits were found in the selected time range.
+              </Typography>
+            </Alert>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* 顯示每天提交熱圖 */}
+              <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                {/* 星期標籤區域已移除 */}
+                
+                {/* 顯示提交熱圖 */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  height: '100%', 
+                  flex: 1,
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  borderRadius: 1,
+                  p: 1,
+                  backgroundColor: 'rgba(255,255,255,0.8)'
+                }}>
+                  {/* 提交方格區域 */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexWrap: 'wrap', 
+                    flex: 1,
+                    overflowY: 'auto',
+                    position: 'relative',
+                    py: 1
+                  }}>
+                    {/* 月份標記已徹底刪除 */}
+                    
+                    {/* 熱圖方格 */}
+                    {commitData.dates.map((date, index) => {
+                      const count = commitData.counts[index];
+                      const day = new Date(date).getDay(); // 0 = Sunday, 6 = Saturday
+                      const isSelected = date === selectedDate;
+                      
+                      return (
+                        <Tooltip
+                          key={date}
+                          title={`${date}: ${count} commits`}
+                          arrow
+                        >
+                          <Box
+                            onClick={() => handleDateClick(date)}
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              m: 0.5,
+                              borderRadius: 0.5,
+                              bgcolor: getColor(count),
+                              transition: 'transform 0.2s, box-shadow 0.2s',
+                              border: isSelected ? '2px solid #000' : 'none',
+                              cursor: 'pointer',
+                              outline: day === 0 || day === 6 ? '1px solid rgba(211,47,47,0.2)' : 'none',
+                              zIndex: 1,
+                              '&:hover': {
+                                transform: 'scale(1.2)',
+                                boxShadow: '0 0 5px rgba(0,0,0,0.2)'
+                              }
+                            }}
+                          />
+                        </Tooltip>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              </Box>
+              
+              
+              {/* 顯示選定日期的貢獻者 */}
+              {selectedDate && commitData.authors[selectedDate]?.length > 0 && (
+                <Box sx={{ mt: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Contributors on {selectedDate} ({commitData.authors[selectedDate].length} authors, {commitData.counts[commitData.dates.indexOf(selectedDate)]} commits)
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                    {commitData.authors[selectedDate]
+                      .sort((a, b) => b.count - a.count)
+                      .map((author, idx) => (
+                        <Chip
+                          key={idx}
+                          avatar={<Avatar alt={author.name} src={author.avatar} />}
+                          label={`${author.name} (${author.count})`}
+                          variant="outlined"
+                          size="small"
+                          sx={{ mb: 1 }}
+                        />
+                      ))}
+                  </Box>
+                </Box>
+              )}
+              
+              {/* 圖例 */}
+              <Box sx={{ mt: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="caption" sx={{ mr: 1, fontWeight: 'medium' }}>Activity:</Typography>
+                    <Typography variant="caption" sx={{ mr: 0.5 }}>Less</Typography>
+                    {[0, 1, 3, 7, 15].map(count => (
+                      <Box
+                        key={count}
+                        sx={{
+                          width: 12,
+                          height: 12,
+                          mx: 0.3,
+                          borderRadius: 0.5,
+                          bgcolor: getColor(count)
+                        }}
+                      />
+                    ))}
+                    <Typography variant="caption" sx={{ ml: 0.5 }}>More</Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 'medium' }}>
+                      Click on a day to see contributors details
+                    </Typography>
+                  </Box>
+                </Box>
+                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+                  * Click on a day to see contributors details.
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </Box>
+
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Total Commits: {commitData.counts.reduce((sum, count) => sum + count, 0)}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Most active day: {commitData.counts.length > 0 
+              ? commitData.dates[commitData.counts.indexOf(Math.max(...commitData.counts))]
+              : 'N/A'}
+          </Typography>
+        </Box>
+      </Box>
+    );
+  };
+
   return (
     <AnalyticsContext.Provider value={{ selectedTeam, filteredTeams, extractRepoInfo }}>
     <Box sx={{ display: 'flex' }}>
@@ -3223,6 +3673,62 @@ export default function Analytics() {
                           </Alert>
                         ) : (
                           <ContributorLeaderboard repositoryUrl={filteredTeams.find(t => t._id === selectedTeam)?.repositoryUrl} extractRepoInfo={extractRepoInfo} />
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Daily Commit Heatmap */}
+                  <Grid item xs={12}>
+                    <Card>
+                      <CardHeader 
+                        title={
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Typography variant="h6">Daily Commit Activity</Typography>
+                            <Tooltip title="每日提交活動熱圖">
+                              <IconButton size="small">
+                                <InfoIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        }
+                        subheader="Visualization of daily commit activity patterns"
+                        action={
+                          <Button 
+                            variant="outlined" 
+                            size="small"
+                            startIcon={<RefreshIcon />}
+                            onClick={() => {
+                              // 如果需要刷新這個圖表
+                              if (selectedTeam !== 'All Teams') {
+                                window.dispatchEvent(new CustomEvent('refresh-commit-heatmap'));
+                              }
+                            }}
+                          >
+                            Refresh
+                          </Button>
+                        }
+                      />
+                      <CardContent>
+                        {selectedTeam === 'All Teams' ? (
+                          <Alert severity="info" sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Box>
+                              <AlertTitle>Please select a specific team</AlertTitle>
+                              <Typography variant="body2">
+                              Select a specific team to view its daily commit activity
+                              </Typography>
+                            </Box>
+                          </Alert>
+                        ) : (
+                          (() => {
+                            const teamRepo = filteredTeams.find(t => t._id === selectedTeam)?.repositoryUrl;
+                            return (
+                              <CommitHeatmapChart 
+                                repositoryUrl={teamRepo} 
+                                extractRepoInfo={extractRepoInfo} 
+                              />
+                            );
+                          })()
                         )}
                       </CardContent>
                     </Card>
