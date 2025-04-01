@@ -12,7 +12,6 @@ import Students from './pages/Students'
 import Courses from './pages/Courses'
 import Settings from './pages/Settings'
 import Analytics from './pages/Analytics'
-// import Reports from './pages/Reports'
 import Users from './pages/Users'
 import Assistant from './pages/Assistant'
 import Login from './pages/Login'
@@ -37,7 +36,7 @@ function App() {
         <CssBaseline />
         <div style={{ minHeight: '100vh' }}>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/teams" element={<Teams />} />
             <Route path="/team/:id" element={<TeamDetail />} />
