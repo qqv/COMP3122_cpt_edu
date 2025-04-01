@@ -154,48 +154,85 @@ const TeamRepositoryStats: React.FC<TeamRepositoryStatsProps> = ({ team, student
       }
       
       try {
-        // Get repository stats from API
-        const { data } = await teamService.getGitHubStats(owner, repo);
+        // Get GitHub token from localStorage or from .env
+        const token = localStorage.getItem('github_token') || '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';
         
-        // Get contributors data to calculate total commits
-        const contributorsData = await teamService.getRepoContributors(owner, repo);
-        setContributors(contributorsData);
-        
-        // Calculate total commits from contributors
-        const totalCommitsFromContributors = contributorsData.reduce(
-          (total, contributor) => total + (contributor.contributions || 0), 
-          0
+        // Get commits data directly from GitHub API with authentication
+        const commitsResponse = await fetch(
+          `https://api.github.com/repos/${owner}/${repo}/commits?per_page=100`, 
+          {
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': `Bearer ${token}`,
+              'X-GitHub-Api-Version': '2022-11-28'
+            }
+          }
         );
         
-        // Get Pull Requests data using the specific PR API
-        const { totalCount: prCount } = await teamService.getRepoPullRequests(owner, repo);
+        let totalCommitsCount = 0;
+        if (commitsResponse.ok) {
+          const commits = await commitsResponse.json();
+          totalCommitsCount = commits.length;
+        }
         
-        // Get Issues data directly from GitHub API
-        const token = localStorage.getItem('github_token') || '';
+        // Get PR data directly from GitHub API with authentication
+        const prsResponse = await fetch(
+          `https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=100`, 
+          {
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': `Bearer ${token}`,
+              'X-GitHub-Api-Version': '2022-11-28'
+            }
+          }
+        );
+        
+        let totalPRsCount = 0;
+        if (prsResponse.ok) {
+          const prs = await prsResponse.json();
+          totalPRsCount = prs.length;
+        }
+        
+        // Get Issues data directly from GitHub API with authentication
         const issuesResponse = await fetch(
           `https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100`, 
           {
             headers: {
               'Accept': 'application/vnd.github+json',
-              'Authorization': token ? `Bearer ${token}` : '',
+              'Authorization': `Bearer ${token}`,
               'X-GitHub-Api-Version': '2022-11-28'
             }
           }
         );
         
         let totalIssuesCount = 0;
+        let openIssuesCount = 0;
         if (issuesResponse.ok) {
           const issues = await issuesResponse.json();
           // Filter out pull requests since GitHub API returns them as issues
           const issuesOnly = issues.filter((issue: any) => !issue.pull_request);
           totalIssuesCount = issuesOnly.length;
+          openIssuesCount = issuesOnly.filter((issue: any) => issue.state === 'open').length;
         }
         
+        // Get repository stats from API for backward compatibility
+        const { data } = await teamService.getGitHubStats(owner, repo);
+        
+        // Get contributors data to calculate total commits (fallback)
+        const contributorsData = await teamService.getRepoContributors(owner, repo);
+        setContributors(contributorsData);
+        
+        // Calculate total commits from contributors (as fallback)
+        const totalCommitsFromContributors = contributorsData.reduce(
+          (total, contributor) => total + (contributor.contributions || 0), 
+          0
+        );
+        
         setStats({
-          totalCommits: totalCommitsFromContributors || data.totalCommits || 0,
-          totalPRs: prCount || 0,
-          totalIssues: totalIssuesCount,
-          openIssues: data.openIssues || 0
+          totalCommits: totalCommitsCount || totalCommitsFromContributors || data.totalCommits || 0,
+          totalPRs: totalPRsCount || data.totalPRs || 0,
+          totalIssues: totalIssuesCount || data.totalIssues || 0,
+          openIssues: openIssuesCount || data.openIssues || 0
         });
         
         setLoading(false);
