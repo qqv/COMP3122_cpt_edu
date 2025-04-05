@@ -211,160 +211,247 @@ export const teamService = {
 
   getGitHubStats: async (owner: string, repo: string) => {
     try {
-      console.log(`Fetching GitHub stats for ${owner}/${repo}`);
-      
-      // 嘗試使用後端 API 獲取
-      try {
-        const { data } = await api.get(`/github/${owner}/${repo}/stats`);
-        return { data };
-      } catch (backendError) {
-        console.log('Backend API for GitHub stats not available, falling back to direct GitHub API');
-        
-        // 使用 GitHub API 直接獲取數據
-        const headers = {
-          'Accept': 'application/vnd.github.v3+json'
-        };
-
-        // 使用 master 分支獲取提交數據
-        const commitsResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=100&sha=master`, { headers });
-        let commits = [];
-        
-        if (commitsResponse.ok) {
-          commits = await commitsResponse.json();
-        } else {
-          console.error(`GitHub API error: ${commitsResponse.status} - ${await commitsResponse.text()}`);
-        }
-
-        // 獲取 PR 數據 
-        const prsResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=100`, { headers });
-        let prs = [];
-        
-        if (prsResponse.ok) {
-          prs = await prsResponse.json();
-        } else {
-          console.error(`GitHub API error: ${prsResponse.status} - ${await prsResponse.text()}`);
-        }
-
-        // 獲取問題數據
-        const issuesResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100`, { headers });
-        let issues = [];
-        
-        if (issuesResponse.ok) {
-          issues = await issuesResponse.json();
-          // Filter out pull requests from issues
-          issues = issues.filter((issue: any) => !issue.pull_request);
-        } else {
-          console.error(`GitHub API error: ${issuesResponse.status} - ${await issuesResponse.text()}`);
-        }
-
-        // 計算月度和週度數據
-        const dateSort = (a: any, b: any) => {
-          return new Date(a.date).getTime() - new Date(b.date).getTime();
-        };
-
-        // 按月分組提交
-        const commitsByMonth: number[] = [];
-        const lastSixMonths: Array<{month: number, year: number}> = [];
-        
-        for (let i = 5; i >= 0; i--) {
-          const date = new Date();
-          date.setMonth(date.getMonth() - i);
-          lastSixMonths.push({
-            month: date.getMonth(),
-            year: date.getFullYear()
-          });
-        }
-        
-        for (const monthData of lastSixMonths) {
-          const count = commits.filter((commit: any) => {
-            const commitDate = new Date(commit.commit.author.date);
-            return commitDate.getMonth() === monthData.month && 
-                  commitDate.getFullYear() === monthData.year;
-          }).length;
-          
-          commitsByMonth.push(count);
-        }
-        
-        // 按週計算最近6週的趨勢
-        const commitTrends: number[] = [];
-        const prTrends: number[] = [];
-        const issueTrends: number[] = [];
-        
-        for (let i = 5; i >= 0; i--) {
-          const endDate = new Date();
-          endDate.setHours(23, 59, 59, 999);
-          
-          const startDate = new Date();
-          startDate.setDate(startDate.getDate() - (i * 7) - 6);
-          startDate.setHours(0, 0, 0, 0);
-          
-          // 計算當前週的提交數
-          const weekCommits = commits.filter((commit: any) => {
-            const commitDate = new Date(commit.commit.author.date);
-            return commitDate >= startDate && commitDate <= endDate;
-          }).length;
-          
-          // 計算當前週的 PR 數
-          const weekPRs = prs.filter((pr: any) => {
-            const prDate = new Date(pr.created_at);
-            return prDate >= startDate && prDate <= endDate;
-          }).length;
-          
-          // 計算當前週的問題數
-          const weekIssues = issues.filter((issue: any) => {
-            const issueDate = new Date(issue.created_at);
-            return issueDate >= startDate && issueDate <= endDate;
-          }).length;
-          
-          commitTrends.push(weekCommits);
-          prTrends.push(weekPRs);
-          issueTrends.push(weekIssues);
-        }
-        
-        // 按月分組問題
-        const issuesOpened: number[] = [];
-        const issuesClosed: number[] = [];
-        
-        for (const monthData of lastSixMonths) {
-          const openedCount = issues.filter((issue: any) => {
-            const issueDate = new Date(issue.created_at);
-            return issueDate.getMonth() === monthData.month && 
-                  issueDate.getFullYear() === monthData.year;
-          }).length;
-          
-          const closedCount = issues.filter((issue: any) => {
-            if (!issue.closed_at) return false;
-            const closeDate = new Date(issue.closed_at);
-            return closeDate.getMonth() === monthData.month && 
-                  closeDate.getFullYear() === monthData.year;
-          }).length;
-          
-          issuesOpened.push(openedCount);
-          issuesClosed.push(closedCount);
-        }
-        
-        const totalCommits = commits.length;
-        const totalPRs = prs.length;
-        const totalIssues = issues.length;
-        const openIssues = issues.filter((issue: any) => issue.state === 'open').length;
-        const closedIssues = issues.filter((issue: any) => issue.state === 'closed').length;
-        
-        return {
-          data: {
-            commitsByMonth,
-            issuesOpened,
-            issuesClosed,
-            commitTrends,
-            prTrends,
-            issueTrends,
-            totalCommits,
-            totalPRs,
-            totalIssues,
-            openIssues,
-            closedIssues
-          }
-        };
+      if (!owner || !repo) {
+        throw new Error('Owner and repo are required');
       }
+      
+      // Get GitHub token from localStorage or from .env
+      const token = localStorage.getItem('github_token') || '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';
+      
+      // Function to fetch commits with pagination to get more than 100
+      const fetchAllCommits = async () => {
+        let page = 1;
+        let allCommits: any[] = [];
+        let hasMore = true;
+        
+        while (hasMore) {
+          const response = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/commits?per_page=100&page=${page}`, 
+            {
+              headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': `Bearer ${token}`,
+                'X-GitHub-Api-Version': '2022-11-28'
+              }
+            }
+          );
+          
+          if (response.ok) {
+            const commits = await response.json();
+            if (commits.length > 0) {
+              allCommits = [...allCommits, ...commits];
+              page++;
+            } else {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
+          }
+          
+          // Limit to 5 pages (500 commits) to avoid hitting rate limits
+          if (page > 5) {
+            hasMore = false;
+          }
+        }
+        
+        return allCommits;
+      };
+      
+      // Get all commits with pagination
+      const commits = await fetchAllCommits();
+      
+      // 函數用於分頁獲取所有 PR 數據
+      const fetchAllPRs = async () => {
+        let page = 1;
+        let allPRs: any[] = [];
+        let hasMore = true;
+        
+        while (hasMore) {
+          const response = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=100&page=${page}`, 
+            {
+              headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': `Bearer ${token}`,
+                'X-GitHub-Api-Version': '2022-11-28'
+              }
+            }
+          );
+          
+          if (response.ok) {
+            const prs = await response.json();
+            if (prs.length > 0) {
+              allPRs = [...allPRs, ...prs];
+              page++;
+            } else {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
+          }
+          
+          // 最多獲取 5 頁 (500 個 PR) 以避免超出 API 限制
+          if (page > 5) {
+            hasMore = false;
+          }
+        }
+        
+        return allPRs;
+      };
+      
+      // 使用分頁函數獲取所有 issues
+      const fetchAllIssues = async () => {
+        let page = 1;
+        let allIssues: any[] = [];
+        let hasMore = true;
+        
+        while (hasMore) {
+          const response = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100&page=${page}`, 
+            {
+              headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': `Bearer ${token}`,
+                'X-GitHub-Api-Version': '2022-11-28'
+              }
+            }
+          );
+          
+          if (response.ok) {
+            const issues = await response.json();
+            if (issues.length > 0) {
+              allIssues = [...allIssues, ...issues];
+              page++;
+            } else {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
+          }
+          
+          // 最多獲取 5 頁 (500 個 issues) 以避免超出 API 限制
+          if (page > 5) {
+            hasMore = false;
+          }
+        }
+        
+        // 過濾掉 PR (GitHub API 中 issues 包含 PR)
+        return allIssues.filter((issue: any) => !issue.pull_request);
+      };
+      
+      // 並行獲取 PR 和 issue 數據
+      const [prs, issues] = await Promise.all([
+        fetchAllPRs(),
+        fetchAllIssues()
+      ]);
+      
+      // 計算月度和週度數據
+      const dateSort = (a: any, b: any) => {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      };
+
+      // 按月分組提交
+      const commitsByMonth: number[] = [];
+      const lastSixMonths: Array<{month: number, year: number}> = [];
+      
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        lastSixMonths.push({
+          month: date.getMonth(),
+          year: date.getFullYear()
+        });
+      }
+      
+      for (const monthData of lastSixMonths) {
+        const count = commits.filter((commit: any) => {
+          const commitDate = new Date(commit.commit.author.date);
+          return commitDate.getMonth() === monthData.month && 
+                commitDate.getFullYear() === monthData.year;
+        }).length;
+        
+        commitsByMonth.push(count);
+      }
+      
+      // 按週計算最近6週的趨勢
+      const commitTrends: number[] = [];
+      const prTrends: number[] = [];
+      const issueTrends: number[] = [];
+      
+      for (let i = 5; i >= 0; i--) {
+        const endDate = new Date();
+        endDate.setHours(23, 59, 59, 999);
+        
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - (i * 7) - 6);
+        startDate.setHours(0, 0, 0, 0);
+        
+        // 計算當前週的提交數
+        const weekCommits = commits.filter((commit: any) => {
+          const commitDate = new Date(commit.commit.author.date);
+          return commitDate >= startDate && commitDate <= endDate;
+        }).length;
+        
+        // 計算當前週的 PR 數
+        const weekPRs = prs.filter((pr: any) => {
+          const prDate = new Date(pr.created_at);
+          return prDate >= startDate && prDate <= endDate;
+        }).length;
+        
+        // 計算當前週的問題數
+        const weekIssues = issues.filter((issue: any) => {
+          const issueDate = new Date(issue.created_at);
+          return issueDate >= startDate && issueDate <= endDate;
+        }).length;
+        
+        commitTrends.push(weekCommits);
+        prTrends.push(weekPRs);
+        issueTrends.push(weekIssues);
+      }
+      
+      // 按月分組問題
+      const issuesOpened: number[] = [];
+      const issuesClosed: number[] = [];
+      
+      for (const monthData of lastSixMonths) {
+        const openedCount = issues.filter((issue: any) => {
+          const issueDate = new Date(issue.created_at);
+          return issueDate.getMonth() === monthData.month && 
+                issueDate.getFullYear() === monthData.year;
+        }).length;
+        
+        const closedCount = issues.filter((issue: any) => {
+          if (!issue.closed_at) return false;
+          const closeDate = new Date(issue.closed_at);
+          return closeDate.getMonth() === monthData.month && 
+                closeDate.getFullYear() === monthData.year;
+        }).length;
+        
+        issuesOpened.push(openedCount);
+        issuesClosed.push(closedCount);
+      }
+      
+      const totalCommits = commits.length;
+      const totalPRs = prs.length;
+      const totalIssues = issues.length;
+      const openIssues = issues.filter((issue: any) => issue.state === 'open').length;
+      const closedIssues = issues.filter((issue: any) => issue.state === 'closed').length;
+      
+      return {
+        data: {
+          commitsByMonth,
+          issuesOpened,
+          issuesClosed,
+          commitTrends,
+          prTrends,
+          issueTrends,
+          totalCommits,
+          totalPRs,
+          totalIssues,
+          openIssues,
+          closedIssues
+        }
+      };
     } catch (error) {
       console.error('Error in getGitHubStats:', error);
       return {
@@ -474,76 +561,96 @@ export const teamService = {
         'X-GitHub-Api-Version': '2022-11-28'
       };
       
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=100`, { headers });
-      
-      if (response.ok) {
-        const pullRequests = await response.json();
-        console.log("Pull Requests data:", pullRequests);
+      // 分頁獲取所有 PR 數據
+      const fetchAllPullRequests = async () => {
+        let page = 1;
+        let allPullRequests: any[] = [];
+        let hasMore = true;
         
-        // 統計每個貢獻者的 PR 數量
-        interface ContributorStat {
-          login: string;
-          id: number;
-          avatar_url: string;
-          total_prs: number;
-          open_prs: number;
-          closed_prs: number;
-          merged_prs: number;
-          url: string;
-        }
-        
-        const contributorStats: Record<string, ContributorStat> = {};
-        
-        for (const pr of pullRequests) {
-          const username = pr.user.login;
+        while (hasMore) {
+          const response = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=100&page=${page}`, 
+            { headers }
+          );
           
-          if (!contributorStats[username]) {
-            contributorStats[username] = {
-              login: username,
-              id: pr.user.id,
-              avatar_url: pr.user.avatar_url,
-              total_prs: 0,
-              open_prs: 0,
-              closed_prs: 0,
-              merged_prs: 0,
-              url: pr.user.html_url
-            };
-          }
-          
-          contributorStats[username].total_prs++;
-          
-          if (pr.state === 'open') {
-            contributorStats[username].open_prs++;
-          } else if (pr.merged_at) {
-            contributorStats[username].merged_prs++;
+          if (response.ok) {
+            const prs = await response.json();
+            if (prs.length > 0) {
+              allPullRequests = [...allPullRequests, ...prs];
+              page++;
+            } else {
+              hasMore = false;
+            }
           } else {
-            contributorStats[username].closed_prs++;
+            hasMore = false;
+          }
+          
+          // 最多獲取 5 頁數據 (500 個 PR) 以避免超出 API 限制
+          if (page > 5) {
+            hasMore = false;
           }
         }
         
-        // 轉換成數組並排序
-        const contributorsArray = Object.values(contributorStats);
-        contributorsArray.sort((a: ContributorStat, b: ContributorStat) => b.total_prs - a.total_prs);
-        
-        return {
-          pullRequests,
-          contributorsStats: contributorsArray,
-          totalCount: pullRequests.length,
-          openCount: pullRequests.filter(pr => pr.state === 'open').length,
-          closedCount: pullRequests.filter(pr => pr.state === 'closed' && !pr.merged_at).length,
-          mergedCount: pullRequests.filter(pr => pr.merged_at).length
-        };
-      } else {
-        console.error(`GitHub API error: ${response.status} - ${await response.text()}`);
-        return {
-          pullRequests: [],
-          contributorsStats: [],
-          totalCount: 0,
-          openCount: 0,
-          closedCount: 0,
-          mergedCount: 0
-        };
+        return allPullRequests;
+      };
+      
+      // 使用分頁獲取所有 PR 數據
+      const pullRequests = await fetchAllPullRequests();
+      console.log("Pull Requests data:", pullRequests);
+      
+      // 統計每個貢獻者的 PR 數量
+      interface ContributorStat {
+        login: string;
+        id: number;
+        avatar_url: string;
+        total_prs: number;
+        open_prs: number;
+        closed_prs: number;
+        merged_prs: number;
+        url: string;
       }
+      
+      const contributorStats: Record<string, ContributorStat> = {};
+      
+      for (const pr of pullRequests) {
+        const username = pr.user.login;
+        
+        if (!contributorStats[username]) {
+          contributorStats[username] = {
+            login: username,
+            id: pr.user.id,
+            avatar_url: pr.user.avatar_url,
+            total_prs: 0,
+            open_prs: 0,
+            closed_prs: 0,
+            merged_prs: 0,
+            url: pr.user.html_url
+          };
+        }
+        
+        contributorStats[username].total_prs++;
+        
+        if (pr.state === 'open') {
+          contributorStats[username].open_prs++;
+        } else if (pr.merged_at) {
+          contributorStats[username].merged_prs++;
+        } else {
+          contributorStats[username].closed_prs++;
+        }
+      }
+      
+      // 轉換成數組並排序
+      const contributorsArray = Object.values(contributorStats);
+      contributorsArray.sort((a: ContributorStat, b: ContributorStat) => b.total_prs - a.total_prs);
+      
+      return {
+        pullRequests,
+        contributorsStats: contributorsArray,
+        totalCount: pullRequests.length,
+        openCount: pullRequests.filter(pr => pr.state === 'open').length,
+        closedCount: pullRequests.filter(pr => pr.state === 'closed' && !pr.merged_at).length,
+        mergedCount: pullRequests.filter(pr => pr.merged_at).length
+      };
     } catch (error) {
       console.error('Error fetching repository pull requests:', error);
       return {

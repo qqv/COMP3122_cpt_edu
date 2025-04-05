@@ -160,63 +160,138 @@ const TeamRepositoryStats: React.FC<TeamRepositoryStatsProps> = ({ team, student
         // Get GitHub token from localStorage or from .env
         const token = localStorage.getItem('github_token') || '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';
         
-        // Get commits data directly from GitHub API with authentication
-        const commitsResponse = await fetch(
-          `https://api.github.com/repos/${owner}/${repo}/commits?per_page=100`, 
-          {
-            headers: {
-              'Accept': 'application/vnd.github+json',
-              'Authorization': `Bearer ${token}`,
-              'X-GitHub-Api-Version': '2022-11-28'
+        // Function to fetch commits with pagination
+        const fetchAllCommits = async () => {
+          let page = 1;
+          let allCommits: any[] = [];
+          let hasMore = true;
+          
+          while (hasMore) {
+            const response = await fetch(
+              `https://api.github.com/repos/${owner}/${repo}/commits?per_page=100&page=${page}`, 
+              {
+                headers: {
+                  'Accept': 'application/vnd.github+json',
+                  'Authorization': `Bearer ${token}`,
+                  'X-GitHub-Api-Version': '2022-11-28'
+                }
+              }
+            );
+            
+            if (response.ok) {
+              const commits = await response.json();
+              if (commits.length > 0) {
+                allCommits = [...allCommits, ...commits];
+                page++;
+              } else {
+                hasMore = false;
+              }
+            } else {
+              hasMore = false;
+            }
+            
+            // Check if we've reached 5 pages (500 commits) to avoid hitting rate limits
+            if (page > 5) {
+              hasMore = false;
             }
           }
-        );
+          
+          return allCommits;
+        };
         
-        let totalCommitsCount = 0;
-        if (commitsResponse.ok) {
-          const commits = await commitsResponse.json();
-          totalCommitsCount = commits.length;
-        }
+        // Fetch all commits with pagination
+        const allCommits = await fetchAllCommits();
+        const totalCommitsCount = allCommits.length;
         
-        // Get PR data directly from GitHub API with authentication
-        const prsResponse = await fetch(
-          `https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=100`, 
-          {
-            headers: {
-              'Accept': 'application/vnd.github+json',
-              'Authorization': `Bearer ${token}`,
-              'X-GitHub-Api-Version': '2022-11-28'
+        // Function to fetch PRs with pagination
+        const fetchAllPRs = async () => {
+          let page = 1;
+          let allPRs: any[] = [];
+          let hasMore = true;
+          
+          while (hasMore) {
+            const response = await fetch(
+              `https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=100&page=${page}`, 
+              {
+                headers: {
+                  'Accept': 'application/vnd.github+json',
+                  'Authorization': `Bearer ${token}`,
+                  'X-GitHub-Api-Version': '2022-11-28'
+                }
+              }
+            );
+            
+            if (response.ok) {
+              const prs = await response.json();
+              if (prs.length > 0) {
+                allPRs = [...allPRs, ...prs];
+                page++;
+              } else {
+                hasMore = false;
+              }
+            } else {
+              hasMore = false;
+            }
+            
+            // Check if we've reached 5 pages (500 PRs) to avoid hitting rate limits
+            if (page > 5) {
+              hasMore = false;
             }
           }
-        );
+          
+          return allPRs;
+        };
         
-        let totalPRsCount = 0;
-        if (prsResponse.ok) {
-          const prs = await prsResponse.json();
-          totalPRsCount = prs.length;
-        }
+        // Fetch all PRs with pagination
+        const allPRs = await fetchAllPRs();
+        const totalPRsCount = allPRs.length;
         
-        // Get Issues data directly from GitHub API with authentication
-        const issuesResponse = await fetch(
-          `https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100`, 
-          {
-            headers: {
-              'Accept': 'application/vnd.github+json',
-              'Authorization': `Bearer ${token}`,
-              'X-GitHub-Api-Version': '2022-11-28'
+        // Function to fetch issues with pagination and filter PRs
+        const fetchAllIssues = async () => {
+          let page = 1;
+          let allIssues: any[] = [];
+          let hasMore = true;
+          
+          while (hasMore) {
+            const response = await fetch(
+              `https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100&page=${page}`, 
+              {
+                headers: {
+                  'Accept': 'application/vnd.github+json',
+                  'Authorization': `Bearer ${token}`,
+                  'X-GitHub-Api-Version': '2022-11-28'
+                }
+              }
+            );
+            
+            if (response.ok) {
+              const issues = await response.json();
+              if (issues.length > 0) {
+                allIssues = [...allIssues, ...issues];
+                page++;
+              } else {
+                hasMore = false;
+              }
+            } else {
+              hasMore = false;
+            }
+            
+            // Check if we've reached 5 pages (500 issues) to avoid hitting rate limits
+            if (page > 5) {
+              hasMore = false;
             }
           }
-        );
+          
+          return allIssues;
+        };
         
-        let totalIssuesCount = 0;
-        let openIssuesCount = 0;
-        if (issuesResponse.ok) {
-          const issues = await issuesResponse.json();
-          // Filter out pull requests since GitHub API returns them as issues
-          const issuesOnly = issues.filter((issue: any) => !issue.pull_request);
-          totalIssuesCount = issuesOnly.length;
-          openIssuesCount = issuesOnly.filter((issue: any) => issue.state === 'open').length;
-        }
+        // Fetch all issues with pagination
+        const allIssues = await fetchAllIssues();
+        
+        // Filter out pull requests since GitHub API returns them as issues
+        const issuesOnly = allIssues.filter((issue: any) => !issue.pull_request);
+        const totalIssuesCount = issuesOnly.length;
+        const openIssuesCount = issuesOnly.filter((issue: any) => issue.state === 'open').length;
         
         // Get repository stats from API for backward compatibility
         const { data } = await teamService.getGitHubStats(owner, repo);
@@ -231,8 +306,15 @@ const TeamRepositoryStats: React.FC<TeamRepositoryStatsProps> = ({ team, student
           0
         );
         
+        // Use the maximum value from our different sources
+        const finalTotalCommits = Math.max(
+          totalCommitsCount,
+          totalCommitsFromContributors,
+          data.totalCommits || 0
+        );
+        
         setStats({
-          totalCommits: totalCommitsCount || totalCommitsFromContributors || data.totalCommits || 0,
+          totalCommits: finalTotalCommits,
           totalPRs: totalPRsCount || data.totalPRs || 0,
           totalIssues: totalIssuesCount || data.totalIssues || 0,
           openIssues: openIssuesCount || data.openIssues || 0
@@ -948,7 +1030,7 @@ const TeamContributorsComparison: React.FC<TeamContributorsComparisonProps> = ({
                             startIcon={addingMember === contributor.login ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
                             sx={{ fontSize: '0.85rem', ml: 1 }}
                           >
-                            {addingMember === contributor.login ? '添加中...' : '添加到團隊'}
+                            {addingMember === contributor.login ? 'Adding...' : 'Add to team'}
                           </Button>
                         )}
                       </Box>
@@ -3955,10 +4037,7 @@ export default function Analytics() {
               <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
               Please select a course and a specific team first to view detailed analysis
               </Typography>
-              <Alert severity="info" sx={{ maxWidth: 500, mx: 'auto' }}>
-                <AlertTitle>Hint</AlertTitle>
-                Analytics require team-specific data to provide accurate analysis. Please select a course and a specific team (not "All Teams") from the drop-down menu above.
-              </Alert>
+             
             </Box>
           )}
           

@@ -411,17 +411,35 @@ export const GitHubService = {
   async getRepositoryPullRequests(
     owner: string,
     repo: string,
-    state: "all" | "open" | "closed" = "all"
+    state: "all" | "open" | "closed" = "all",
+    limit = 100
   ): Promise<any[]> {
     return withRetry(async () => {
-      const response = await octokit.pulls.list({
-        owner,
-        repo,
-        state,
-        per_page: 100,
-      });
-
-      return response.data;
+      // 如果限制小於或等於 100，只發送一個請求
+      if (limit <= 100) {
+        const response = await octokit.pulls.list({
+          owner,
+          repo,
+          state,
+          per_page: limit,
+        });
+        return response.data;
+      }
+      
+      // 對於較大的限制，使用分頁獲取所有 PR
+      const pullRequests = await octokit.paginate(
+        octokit.pulls.list,
+        {
+          owner,
+          repo,
+          state,
+          per_page: 100,
+        },
+        response => response.data
+      );
+      
+      // 僅返回請求的限制數量
+      return pullRequests.slice(0, limit);
     });
   },
 
@@ -495,13 +513,29 @@ export const GitHubService = {
     limit = 100
   ): Promise<any[]> {
     return withRetry(async () => {
-      const response = await octokit.repos.listCommits({
-        owner,
-        repo,
-        per_page: limit,
-      });
-
-      return response.data;
+      // If limit is less than or equal to 100, just make a single request
+      if (limit <= 100) {
+        const response = await octokit.repos.listCommits({
+          owner,
+          repo,
+          per_page: limit,
+        });
+        return response.data;
+      }
+      
+      // For larger limits, use paginate to get all commits
+      const commits = await octokit.paginate(
+        octokit.repos.listCommits,
+        {
+          owner,
+          repo,
+          per_page: 100,
+        },
+        response => response.data
+      );
+      
+      // Return only up to the requested limit
+      return commits.slice(0, limit);
     });
   },
 
