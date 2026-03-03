@@ -1,5 +1,3 @@
-# cpt_edu
-Collaborative Project Tracker
 # Collaborative Project Tracker
 
 A web application to help instructors track student group projects and collaboration through GitHub Classroom integration.
